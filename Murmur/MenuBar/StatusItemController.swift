@@ -8,18 +8,21 @@ final class StatusItemController {
     private let onShowOnboarding: () -> Void
     private let onCheckForUpdates: () -> Void
     private let onOpenScratchpad: () -> Void
+    private let onOpenSettings: () -> Void
     private let statusItem: NSStatusItem
 
     init(
         appState: AppState,
         onShowOnboarding: @escaping () -> Void,
         onCheckForUpdates: @escaping () -> Void,
-        onOpenScratchpad: @escaping () -> Void
+        onOpenScratchpad: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void
     ) {
         self.appState = appState
         self.onShowOnboarding = onShowOnboarding
         self.onCheckForUpdates = onCheckForUpdates
         self.onOpenScratchpad = onOpenScratchpad
+        self.onOpenSettings = onOpenSettings
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         configureButton()
         statusItem.menu = makeMenu()
@@ -101,8 +104,7 @@ final class StatusItemController {
     }
 
     @objc private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        onOpenSettings()
     }
 
     @objc private func showOnboarding() {

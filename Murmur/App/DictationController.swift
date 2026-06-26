@@ -326,6 +326,22 @@ final class DictationController {
         scheduleErrorReset()
     }
 
+    #if DEBUG
+    /// Drives the HUD into a fake recording state (no audio) for screenshots /
+    /// design iteration. Triggered by the `-hudDemo` launch argument.
+    func startDemo() {
+        guard state == .idle else { return }
+        state = .recording
+        Task { @MainActor in
+            for i in 0..<120 {
+                try? await Task.sleep(for: .milliseconds(80))
+                appendLevel(Float(abs(sin(Double(i) * 0.5)) * 0.9 + 0.1))
+            }
+            state = .idle
+        }
+    }
+    #endif
+
     private func scheduleErrorReset() {
         errorResetTask?.cancel()
         errorResetTask = Task { [weak self] in

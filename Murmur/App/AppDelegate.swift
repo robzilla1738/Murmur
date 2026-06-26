@@ -61,13 +61,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             appState: appState,
             onShowOnboarding: { [weak onboarding] in onboarding?.show() },
             onCheckForUpdates: { [weak updater] in updater?.checkForUpdates() },
-            onOpenScratchpad: { [weak self] in self?.scratchpad.toggle() }
+            onOpenScratchpad: { [weak self] in self?.scratchpad.toggle() },
+            onOpenSettings: { [weak self] in self?.presentSettings() }
         )
 
         observePushToTalkKey()
         observeReactivation()
+        observeWindowClose()
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-hudDemo") {
+            controller.startDemo()
+            return
+        }
+        #endif
 
         onboarding.showIfNeeded()
+    }
+
+    /// Open the SwiftUI Settings window reliably from a menu-bar agent: show a
+    /// Dock icon + activate so the window comes to the front.
+    func presentSettings() {
+        AppActivation.beginWindowSession()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    /// Revert to a Dock-less agent once the last ordinary window closes.
+    private func observeWindowClose() {
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { AppActivation.endWindowSessionSoon() }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

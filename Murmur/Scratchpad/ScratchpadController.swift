@@ -32,7 +32,7 @@ final class ScratchpadController {
             window.setFrameAutosaveName("MurmurScratchpad")
             self.window = window
         }
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.beginWindowSession()
         window?.makeKeyAndOrderFront(nil)
     }
 }

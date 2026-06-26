@@ -13,7 +13,9 @@ final class FloatingHUDPanel: NSPanel {
             defer: false
         )
         isFloatingPanel = true
-        level = .statusBar
+        // Above the system menu bar so the notch HUD overlays the camera housing
+        // (the menu bar sits above .statusBar on notched displays).
+        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
@@ -67,17 +69,26 @@ final class HUDController {
 
     private func present() {
         hideTask?.cancel()
-        let screen = NSScreen.main ?? NSScreen.screens.first
+        // Prefer the screen that actually has a notch; fall back to main.
+        let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
         guard let screen else { return }
 
         let style = resolvedStyle(for: screen)
         let host = NSHostingView(rootView: rootView(style: style, screen: screen))
         host.sizingOptions = [.preferredContentSize]
-        host.layoutSubtreeIfNeeded()
-        let size = host.fittingSize
 
-        panel.setContentSize(size)
+        // Measure AFTER the view is in the window and laid out, or fittingSize
+        // comes back too small and the centering math is wrong.
         panel.contentView = host
+        host.layoutSubtreeIfNeeded()
+        var size = host.fittingSize
+        if size.width < 80 || size.height < 30 {
+            size = NSSize(width: 360, height: 120) // safety fallback
+        }
+        panel.setContentSize(size)
+
         position(panel, style: style, on: screen, size: size)
         panel.orderFrontRegardless()
     }

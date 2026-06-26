@@ -18,31 +18,23 @@ struct NotchShape: Shape {
         let tr = min(topRadius, rect.width / 2)
         let br = min(bottomRadius, rect.width / 2)
 
-        // Top-left outward flare into the menu bar.
-        path.move(to: CGPoint(x: rect.minX - tr, y: rect.minY))
+        // Flat top flush with the display edge (small rounding at top corners),
+        // larger rounded bottom corners — reads as "hanging from the notch".
+        // Stays entirely within bounds so nothing is clipped.
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
         path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.minY + tr),
-            control: CGPoint(x: rect.minX, y: rect.minY)
-        )
-        // Left edge down to bottom-left rounded corner.
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - br))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + br, y: rect.maxY),
-            control: CGPoint(x: rect.minX, y: rect.maxY)
-        )
-        // Bottom edge to bottom-right rounded corner.
-        path.addLine(to: CGPoint(x: rect.maxX - br, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.maxY - br),
+            to: CGPoint(x: rect.maxX - br, y: rect.maxY),
             control: CGPoint(x: rect.maxX, y: rect.maxY)
         )
-        // Right edge up to top-right outward flare.
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + tr))
+        path.addLine(to: CGPoint(x: rect.minX + br, y: rect.maxY))
         path.addQuadCurve(
-            to: CGPoint(x: rect.maxX + tr, y: rect.minY),
-            control: CGPoint(x: rect.maxX, y: rect.minY)
+            to: CGPoint(x: rect.minX, y: rect.maxY - br),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
         )
         path.closeSubpath()
+        _ = tr // top kept square to merge with the black menu-bar/notch region
         return path
     }
 }

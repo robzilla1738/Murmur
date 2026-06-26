@@ -25,7 +25,7 @@ final class OnboardingController {
         appState.permissions.refresh()
 
         if let window {
-            NSApp.activate(ignoringOtherApps: true)
+            AppActivation.beginWindowSession()
             window.makeKeyAndOrderFront(nil)
             return
         }
@@ -47,7 +47,7 @@ final class OnboardingController {
         window.isReleasedWhenClosed = false
         self.window = window
 
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.beginWindowSession()
         window.makeKeyAndOrderFront(nil)
     }
 
