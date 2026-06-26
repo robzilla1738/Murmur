@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboarding: OnboardingController?
     private var updater: UpdaterController?
     private let scratchpad = ScratchpadController()
+    private var settingsWindow: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu-bar agent: no Dock icon, no window at launch.
@@ -66,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let updater = UpdaterController()
         self.updater = updater
 
+        settingsWindow = SettingsWindowController(appState: appState)
+
         statusItemController = StatusItemController(
             appState: appState,
             showUpdatesItem: updater.isConfigured,
@@ -84,16 +87,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.startDemo()
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("-openSettings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.presentSettings() }
+            return
+        }
         #endif
 
         onboarding.showIfNeeded()
     }
 
-    /// Open the SwiftUI Settings window reliably from a menu-bar agent: show a
-    /// Dock icon + activate so the window comes to the front.
+    /// Open the self-managed Settings window (the SwiftUI Settings scene +
+    /// showSettingsWindow: don't open for a menu-bar agent).
     func presentSettings() {
-        AppActivation.beginWindowSession()
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        settingsWindow?.show()
     }
 
     /// Revert to a Dock-less agent once the last ordinary window closes.

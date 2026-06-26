@@ -6,6 +6,8 @@ import SwiftUI
 struct FlowBarView: View {
     var controller: DictationController
 
+    @State private var shown = false
+
     var body: some View {
         HUDContent(controller: controller)
             .padding(.horizontal, 16)
@@ -15,6 +17,11 @@ struct FlowBarView: View {
                 Capsule().strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
             )
             .fixedSize()
+            .scaleEffect(shown ? 1 : 0.9, anchor: .bottom)
+            .opacity(shown ? 1 : 0)
             .padding(8) // room for the panel's shadow
+            .onAppear {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { shown = true }
+            }
     }
 }
