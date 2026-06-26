@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# XcodeGen output (generated from project.yml — never committed)
+*.xcodeproj
+*.xcworkspace
+
+# Build artifacts
+.build/
+DerivedData/
+build/
+*.dmg
+*.zip
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# SwiftPM
+.swiftpm/
+Package.resolved
+
+# Secrets / local config
+*.env
+secrets.*
+ExportOptions.local.plist
