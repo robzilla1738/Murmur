@@ -11,20 +11,20 @@ struct HUDContent: View {
     private var muted: Color { onDark ? .white.opacity(0.6) : Theme.inkMuted }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             icon
             detail
         }
-        .frame(height: 22)
+        .frame(height: 18)
     }
 
     @ViewBuilder
     private var icon: some View {
         switch controller.state {
         case .recording:
+            // Steady — no pulse / color change.
             Image(systemName: "mic.fill")
                 .foregroundStyle(ink)
-                .symbolEffect(.pulse, options: .repeating)
         case .transcribing, .polishing, .downloading:
             ProgressView()
                 .controlSize(.small)
@@ -36,7 +36,7 @@ struct HUDContent: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(ink)
         case .idle:
-            Image(systemName: "waveform")
+            Image(systemName: "mic")
                 .foregroundStyle(muted)
         }
     }
@@ -45,8 +45,8 @@ struct HUDContent: View {
     private var detail: some View {
         switch controller.state {
         case .recording:
-            WaveformView(levels: controller.levels, tint: ink)
-                .frame(width: 130)
+            WaveformView(levels: controller.levels, barCount: 18, tint: ink)
+                .frame(width: 104)
         case .transcribing:
             label("Transcribing…")
         case .polishing:

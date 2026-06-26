@@ -76,20 +76,19 @@ final class HUDController {
         guard let screen else { return }
 
         let style = resolvedStyle(for: screen)
-        let host = NSHostingView(rootView: rootView(style: style, screen: screen))
-        host.sizingOptions = [.preferredContentSize]
+        let view = rootView(style: style, screen: screen)
 
-        // Measure AFTER the view is in the window and laid out, or fittingSize
-        // comes back too small and the centering math is wrong.
+        // Measure the intrinsic SwiftUI size deterministically (fittingSize on a
+        // not-yet-shown NSHostingView is unreliable and broke centering).
+        let measured = NSHostingController(rootView: view)
+            .sizeThatFits(in: NSSize(width: 2000, height: 2000))
+
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(origin: .zero, size: measured)
+        panel.setContentSize(measured)
         panel.contentView = host
-        host.layoutSubtreeIfNeeded()
-        var size = host.fittingSize
-        if size.width < 80 || size.height < 30 {
-            size = NSSize(width: 360, height: 120) // safety fallback
-        }
-        panel.setContentSize(size)
 
-        position(panel, style: style, on: screen, size: size)
+        position(panel, style: style, on: screen, size: measured)
         panel.orderFrontRegardless()
     }
 

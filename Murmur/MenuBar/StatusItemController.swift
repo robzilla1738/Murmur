@@ -9,16 +9,19 @@ final class StatusItemController {
     private let onCheckForUpdates: () -> Void
     private let onOpenScratchpad: () -> Void
     private let onOpenSettings: () -> Void
+    private let showUpdatesItem: Bool
     private let statusItem: NSStatusItem
 
     init(
         appState: AppState,
+        showUpdatesItem: Bool,
         onShowOnboarding: @escaping () -> Void,
         onCheckForUpdates: @escaping () -> Void,
         onOpenScratchpad: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void
     ) {
         self.appState = appState
+        self.showUpdatesItem = showUpdatesItem
         self.onShowOnboarding = onShowOnboarding
         self.onCheckForUpdates = onCheckForUpdates
         self.onOpenScratchpad = onOpenScratchpad
@@ -85,9 +88,11 @@ final class StatusItemController {
         permissions.target = self
         menu.addItem(permissions)
 
-        let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
-        updates.target = self
-        menu.addItem(updates)
+        if showUpdatesItem {
+            let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+            updates.target = self
+            menu.addItem(updates)
+        }
 
         menu.addItem(.separator())
 

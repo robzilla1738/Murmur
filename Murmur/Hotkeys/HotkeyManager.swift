@@ -19,14 +19,18 @@ extension KeyboardShortcuts.Name {
 
 @MainActor
 final class HotkeyManager {
-    var onToggle: (@MainActor () -> Void)?
+    /// Dictation shortcut pressed (hold-to-talk: begin; hands-free: toggle).
+    var onDictationDown: (@MainActor () -> Void)?
+    /// Dictation shortcut released (hold-to-talk: finish; hands-free: ignored).
+    var onDictationUp: (@MainActor () -> Void)?
     var onCancel: (@MainActor () -> Void)?
     var onCommandMode: (@MainActor () -> Void)?
     var onScratchpad: (@MainActor () -> Void)?
     var onTransform: (@MainActor (Int) -> Void)?
 
     func register() {
-        KeyboardShortcuts.onKeyDown(for: .toggleDictation) { [weak self] in self?.onToggle?() }
+        KeyboardShortcuts.onKeyDown(for: .toggleDictation) { [weak self] in self?.onDictationDown?() }
+        KeyboardShortcuts.onKeyUp(for: .toggleDictation) { [weak self] in self?.onDictationUp?() }
         KeyboardShortcuts.onKeyDown(for: .cancelDictation) { [weak self] in self?.onCancel?() }
         KeyboardShortcuts.onKeyDown(for: .commandMode) { [weak self] in self?.onCommandMode?() }
         KeyboardShortcuts.onKeyDown(for: .openScratchpad) { [weak self] in self?.onScratchpad?() }

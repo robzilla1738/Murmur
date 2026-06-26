@@ -9,15 +9,19 @@ struct NotchHUDView: View {
     var topInset: CGFloat
 
     var body: some View {
+        // Compact bar that hangs just below the notch. The top portion sits
+        // behind the menu bar / camera housing (black on black, so it merges);
+        // the visible content sits below that line.
+        let topClearance = max(topInset, 24)
         HUDContent(controller: controller, onDark: true)
-            .padding(.horizontal, 20)
-            .padding(.top, max(topInset, 10) - 2)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 16)
+            .padding(.top, topClearance + 5)
+            .padding(.bottom, 9)
             .background(Color.black)
-            .clipShape(NotchShape(topRadius: 10, bottomRadius: 22))
+            .clipShape(NotchShape(topRadius: 0, bottomRadius: 13))
             .fixedSize()
-            .padding(.horizontal, 16) // room for the top corner flares + shadow
-            .padding(.bottom, 14)
-            .shadow(color: .black.opacity(0.55), radius: 8, y: 3)
+            .padding(.horizontal, 10) // shadow room
+            .padding(.bottom, 12)
+            .shadow(color: .black.opacity(0.5), radius: 6, y: 2)
     }
 }

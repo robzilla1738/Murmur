@@ -42,8 +42,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pushToTalk = ptt
         try? ptt.start() // no-op until Accessibility/Input Monitoring are granted
 
+        let settings = appState.settings
         let hotkeys = HotkeyManager()
-        hotkeys.onToggle = { [weak controller] in controller?.toggle() }
+        hotkeys.onDictationDown = { [weak controller] in
+            guard let controller else { return }
+            // Hold-to-talk vs tap-to-toggle per the activation mode.
+            if settings.activationMode == .pushToTalk { controller.begin() } else { controller.toggle() }
+        }
+        hotkeys.onDictationUp = { [weak controller] in
+            guard let controller else { return }
+            if settings.activationMode == .pushToTalk { controller.finish() }
+        }
         hotkeys.onCancel = { [weak controller] in controller?.cancel() }
         hotkeys.onCommandMode = { [weak controller] in controller?.toggleCommand() }
         hotkeys.onTransform = { [weak controller] index in controller?.runTransform(index) }
@@ -59,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItemController = StatusItemController(
             appState: appState,
+            showUpdatesItem: updater.isConfigured,
             onShowOnboarding: { [weak onboarding] in onboarding?.show() },
             onCheckForUpdates: { [weak updater] in updater?.checkForUpdates() },
             onOpenScratchpad: { [weak self] in self?.scratchpad.toggle() },

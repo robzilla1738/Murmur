@@ -17,13 +17,16 @@ struct ShortcutsPane: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Hands-free") {
-                LabeledContent("Toggle dictation") {
+            Section("Dictation shortcut") {
+                LabeledContent("Dictate") {
                     KeyboardShortcuts.Recorder(for: .toggleDictation)
                 }
-                LabeledContent("Cancel dictation") {
+                LabeledContent("Cancel") {
                     KeyboardShortcuts.Recorder(for: .cancelDictation)
                 }
+                Text("Follows General → Activation: hold to talk (push-to-talk) or tap to start, tap again to stop (hands-free).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Command Mode") {
