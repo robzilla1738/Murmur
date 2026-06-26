@@ -16,30 +16,22 @@ func render(_ pixels: Int) -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 
-    // Rounded-rect background with a subtle near-black vertical gradient.
+    // Simple solid-black rounded-rect background.
     let inset = size * 0.06
     let rect = NSRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
     let radius = rect.width * 0.235
     let bg = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-    let gradient = NSGradient(colors: [
-        NSColor(white: 0.16, alpha: 1),
-        NSColor(white: 0.04, alpha: 1),
-    ])!
-    gradient.draw(in: bg, angle: -90)
+    NSColor.black.setFill()
+    bg.fill()
 
-    // Subtle top highlight stroke.
-    NSColor(white: 1, alpha: 0.06).setStroke()
-    bg.lineWidth = size * 0.006
-    bg.stroke()
-
-    // Centered waveform bars (monochrome, like the app's `waveform` symbol).
+    // Centered white waveform bars (matches the app's `waveform` symbol).
     let heights: [CGFloat] = [0.30, 0.52, 0.78, 1.0, 0.78, 0.52, 0.30]
-    let barWidth = size * 0.055
-    let spacing = size * 0.042
+    let barWidth = size * 0.058
+    let spacing = size * 0.044
     let totalWidth = CGFloat(heights.count) * barWidth + CGFloat(heights.count - 1) * spacing
     var x = size / 2 - totalWidth / 2
-    let maxBarHeight = size * 0.42
-    NSColor(white: 0.96, alpha: 1).setFill()
+    let maxBarHeight = size * 0.44
+    NSColor.white.setFill()
     for h in heights {
         let barHeight = maxBarHeight * h
         let barRect = NSRect(x: x, y: size / 2 - barHeight / 2, width: barWidth, height: barHeight)
