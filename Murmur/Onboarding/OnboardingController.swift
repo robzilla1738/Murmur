@@ -34,7 +34,7 @@ final class OnboardingController {
             self?.finish()
         }
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 540),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 600),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false

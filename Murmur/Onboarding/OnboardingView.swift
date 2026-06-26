@@ -56,7 +56,7 @@ struct OnboardingView: View {
             .tint(.primary)
             .padding(24)
         }
-        .frame(width: 460, height: 540)
+        .frame(width: 460, height: 600)
         .background(.background)
     }
 
