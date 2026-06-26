@@ -37,6 +37,47 @@ func parakeetTranscribesRealAudio() async throws {
     #expect(second.text == first.text, "same audio gave different results across runs: '\(first.text)' vs '\(second.text)'")
 }
 
+/// End-to-end WhisperKit check: granular download progress, load from the
+/// Application-Support folder (not ~/Documents), and transcribe. Uses the small
+/// `openai_whisper-base` model by default for speed.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MURMUR_LIVE_ASR"] == "1"))
+func whisperKitTranscribesRealAudio() async throws {
+    let path = ProcessInfo.processInfo.environment["MURMUR_LIVE_WAV"] ?? "/tmp/murmur_test.wav"
+    let samples = try loadMonoFloat16k(URL(fileURLWithPath: path))
+
+    let modelID = ProcessInfo.processInfo.environment["MURMUR_WK_MODEL"] ?? "openai_whisper-base"
+    let model = TranscriptionModel(id: modelID, displayName: modelID)
+    let engine = WhisperKitEngine(model: model)
+
+    let maxProgress = MaxProgress()
+    try await engine.prepare(model: model) { p in
+        if maxProgress.bump(p) { print("WhisperKit progress: \(Int(p * 100))%") }
+    }
+    // Progress must actually move past the old fixed 0.05 plateau.
+    #expect(maxProgress.value > 0.05, "download progress never advanced past 5% (the stuck-at-5% bug)")
+
+    let result = try await engine.transcribe(samples: samples, options: TranscriptionOptions(language: "en"))
+    print("WhisperKit ASR: \(result.text)")
+    #expect(!result.text.isEmpty, "WhisperKit transcription was empty")
+    let n = result.text.lowercased()
+    #expect(n.contains("murmur") || n.contains("transcription") || n.contains("test") || n.contains("fox"),
+            "transcript didn't contain expected words: \(result.text)")
+}
+
+/// Thread-safe max-progress tracker for the `@Sendable` progress callback.
+private final class MaxProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value = 0.0
+    var value: Double { lock.lock(); defer { lock.unlock() }; return _value }
+    /// Record `p`; returns true when it advanced by a visible step.
+    func bump(_ p: Double) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard p > _value + 0.1 else { return false }
+        _value = p
+        return true
+    }
+}
+
 /// Load any audio file as 16 kHz mono Float32 — the format every engine expects.
 private func loadMonoFloat16k(_ url: URL) throws -> [Float] {
     let file = try AVAudioFile(forReading: url)
