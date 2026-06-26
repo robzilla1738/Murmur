@@ -11,11 +11,15 @@ struct HUDContent: View {
     private var muted: Color { onDark ? .white.opacity(0.6) : Theme.inkMuted }
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 10) {
             icon
+                .font(.system(size: 13, weight: .semibold))
             detail
         }
-        .frame(height: 18)
+        .frame(height: 22)
+        // A generous, consistent width so the recording HUD reads as substantial
+        // (not a thin sliver) and the surface doesn't jump in size between states.
+        .frame(minWidth: 188)
     }
 
     @ViewBuilder
@@ -45,8 +49,8 @@ struct HUDContent: View {
     private var detail: some View {
         switch controller.state {
         case .recording:
-            WaveformView(levels: controller.levels, barCount: 18, tint: ink)
-                .frame(width: 104)
+            WaveformView(levels: controller.levels, barCount: 28, tint: ink)
+                .frame(width: 168)
         case .transcribing:
             label("Transcribing…")
         case .polishing:

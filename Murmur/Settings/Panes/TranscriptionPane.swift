@@ -48,7 +48,17 @@ struct TranscriptionPane: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Transcription")
-        .onChange(of: settings.transcriptionEngineID) { _, _ in prepareState = .idle }
+        .onChange(of: settings.transcriptionEngineID) { _, _ in
+            appState.registry.resetPreparedEngine()
+            prepareState = appState.registry.isCurrentEnginePrepared ? .ready : .idle
+        }
+        .onChange(of: settings.selectedTranscriptionModel(for: engine).id) { _, _ in
+            appState.registry.resetPreparedEngine()
+            prepareState = .idle
+        }
+        .onAppear {
+            if appState.registry.isCurrentEnginePrepared { prepareState = .ready }
+        }
     }
 
     @ViewBuilder
@@ -80,13 +90,12 @@ struct TranscriptionPane: View {
     }
 
     private func prepareModel() {
-        let settings = appState.settings
-        let model = settings.selectedTranscriptionModel(for: settings.transcriptionEngineID)
         prepareState = .working(0)
         Task {
             do {
-                let engine = try appState.registry.makeTranscriptionEngine()
-                try await engine.prepare(model: model) { progress in
+                // Warm the SHARED registry engine so the dictation pipeline reuses
+                // this exact prepared model (no redundant re-download/reload).
+                _ = try await appState.registry.preparedTranscriptionEngine { progress in
                     Task { @MainActor in
                         if case .working = prepareState { prepareState = .working(progress) }
                     }

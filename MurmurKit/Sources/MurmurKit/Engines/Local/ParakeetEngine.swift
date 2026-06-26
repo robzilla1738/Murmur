@@ -12,7 +12,6 @@ public actor ParakeetEngine: TranscriptionEngine {
 
     private let version: AsrModelVersion
     private var manager: AsrManager?
-    private var decoderState: TdtDecoderState?
 
     public init(model: TranscriptionModel) {
         switch model.id {
@@ -32,7 +31,6 @@ public actor ParakeetEngine: TranscriptionEngine {
         try await manager.loadModels(models)
 
         self.manager = manager
-        self.decoderState = try TdtDecoderState()
         progress(1)
         Log.engine.info("Parakeet \(String(describing: self.version), privacy: .public) ready")
     }
@@ -41,10 +39,13 @@ public actor ParakeetEngine: TranscriptionEngine {
         guard !samples.isEmpty else { throw TranscriptionError.emptyAudio }
         guard let manager else { throw TranscriptionError.modelNotPrepared }
 
-        var state = try decoderState ?? TdtDecoderState()
+        // A FRESH decoder state per dictation. The TDT decoder state is meant for
+        // a continuous stream; reusing it across separate one-shot utterances
+        // bleeds prior context in and produces garbled/empty output on the 2nd+
+        // dictation.
+        var state = try TdtDecoderState()
         let language = options.language.flatMap { Language(rawValue: $0) }
         let result = try await manager.transcribe(samples, decoderState: &state, language: language)
-        self.decoderState = state
 
         return TranscriptionResult(
             text: result.text.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -57,6 +58,5 @@ public actor ParakeetEngine: TranscriptionEngine {
     public func unload() async {
         if let manager { await manager.cleanup() }
         manager = nil
-        decoderState = nil
     }
 }

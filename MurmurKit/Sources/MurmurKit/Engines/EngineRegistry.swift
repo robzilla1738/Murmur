@@ -8,6 +8,12 @@ public final class EngineRegistry {
     private let settings: AppSettings
     private let keychain: KeychainStore
 
+    /// One prepared transcription engine shared by Settings ("Download & load")
+    /// and the dictation pipeline, so warming the model once benefits both.
+    private var prepared: (key: String, engine: any TranscriptionEngine)?
+    /// In-flight prepare, so concurrent callers await the same work.
+    private var preparing: (key: String, task: Task<any TranscriptionEngine, Error>)?
+
     public init(settings: AppSettings, keychain: KeychainStore) {
         self.settings = settings
         self.keychain = keychain
@@ -15,6 +21,60 @@ public final class EngineRegistry {
 
     public func currentTranscriptionModel() -> TranscriptionModel {
         settings.selectedTranscriptionModel(for: settings.transcriptionEngineID)
+    }
+
+    /// Identity of the currently-selected engine+model.
+    private func currentKey() -> String {
+        "\(settings.transcriptionEngineID.rawValue)-\(currentTranscriptionModel().id)"
+    }
+
+    /// Whether the currently-selected engine+model is already prepared in memory.
+    public var isCurrentEnginePrepared: Bool {
+        prepared?.key == currentKey()
+    }
+
+    /// Return a prepared engine for the current settings, reusing the cached one
+    /// when the engine+model is unchanged. Cloud engines "prepare" instantly;
+    /// local engines download (first run) + load CoreML. Concurrent calls for the
+    /// same key share one prepare task.
+    public func preparedTranscriptionEngine(
+        progress: @Sendable @escaping (Double) -> Void = { _ in }
+    ) async throws -> any TranscriptionEngine {
+        let key = currentKey()
+
+        if let prepared, prepared.key == key { progress(1); return prepared.engine }
+        if let preparing, preparing.key == key { return try await preparing.task.value }
+
+        // Switching engine/model — drop the old one.
+        if let old = prepared { await old.engine.unload(); self.prepared = nil }
+
+        let engine = try makeTranscriptionEngine()
+        let model = currentTranscriptionModel()
+        let task = Task<any TranscriptionEngine, Error> {
+            try await engine.prepare(model: model, progress: progress)
+            return engine
+        }
+        preparing = (key, task)
+        defer { if preparing?.key == key { preparing = nil } }
+
+        do {
+            let ready = try await task.value
+            prepared = (key, ready)
+            return ready
+        } catch {
+            // Leave nothing cached so the next attempt retries cleanly.
+            if prepared?.key == key { prepared = nil }
+            throw error
+        }
+    }
+
+    /// Drop any prepared/in-flight engine (e.g. when the user changes engine/model).
+    public func resetPreparedEngine() {
+        let old = prepared
+        prepared = nil
+        preparing?.task.cancel()
+        preparing = nil
+        if let old { Task { await old.engine.unload() } }
     }
 
     /// Construct the transcription engine for the current settings.

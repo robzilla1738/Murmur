@@ -48,8 +48,6 @@ final class DictationController {
     /// SwiftData context for History (set by `AppDelegate`).
     var historyContext: ModelContext?
 
-    /// Cached prepared transcription engine, keyed by engine+model.
-    private var prepared: (key: String, engine: any TranscriptionEngine)?
     private var targetApp: AccessibilityReader.FrontmostApp?
     private var commandSelection: String?
     private var recordingStart: Date?
@@ -263,23 +261,21 @@ final class DictationController {
         try? context.save()
     }
 
-    /// Build + prepare the selected engine, reusing the cached one when possible.
+    /// Get the prepared engine from the shared registry cache, surfacing local
+    /// download progress in the HUD. Settings "Download & load" warms the very
+    /// same engine, so a model downloaded there is reused here instantly.
     private func prepareEngine() async throws -> any TranscriptionEngine {
-        let model = registry.currentTranscriptionModel()
-        let key = "\(settings.transcriptionEngineID.rawValue)-\(model.id)"
-        if let prepared, prepared.key == key { return prepared.engine }
-
-        if let old = prepared { await old.engine.unload() }
-
-        let engine = try registry.makeTranscriptionEngine()
-        try await engine.prepare(model: model) { [weak self] progress in
+        let isLocal = settings.transcriptionEngineID.isLocal
+        if isLocal, !registry.isCurrentEnginePrepared {
+            state = .downloading(0)
+        }
+        return try await registry.preparedTranscriptionEngine { [weak self] progress in
             Task { @MainActor in
-                guard let self, progress < 1 else { return }
-                if engine.isLocal { self.state = .downloading(progress) }
+                guard let self, isLocal, progress < 1 else { return }
+                if case .transcribing = self.state { self.state = .downloading(progress) }
+                else if case .downloading = self.state { self.state = .downloading(progress) }
             }
         }
-        prepared = (key, engine)
-        return engine
     }
 
     /// Run AI cleanup; on failure, fall back to the raw transcript.

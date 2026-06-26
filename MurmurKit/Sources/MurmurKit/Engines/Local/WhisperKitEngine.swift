@@ -25,8 +25,16 @@ public final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
         if whisperKit != nil { progress(1); return }
         // WhisperKit downloads + loads inside init; no granular callback, so we
         // report start/finish and let the HUD show the downloading state.
+        //
+        // `downloadBase` is explicit: WhisperKit's HubApi otherwise writes to
+        // ~/Documents/huggingface, which is TCC-gated for our hardened-runtime
+        // menu-bar agent and fails the download silently. See `ModelStorage`.
         progress(0.05)
-        let config = WhisperKitConfig(model: model.id, download: true)
+        let config = WhisperKitConfig(
+            model: model.id,
+            downloadBase: ModelStorage.whisperKitDirectory,
+            download: true
+        )
         whisperKit = try await WhisperKit(config)
         progress(1)
         Log.engine.info("WhisperKit \(model.id, privacy: .public) ready")

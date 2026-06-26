@@ -31,11 +31,17 @@ struct OnboardingView: View {
                 PermissionRow(
                     icon: "keyboard",
                     title: "Input Monitoring",
-                    description: "Detect your push-to-talk key globally.",
+                    description: "Detect your hold-to-talk key (Right ⌘) globally.",
                     status: permissions.inputMonitoring,
                     action: { permissions.requestInputMonitoring() },
                     openSettings: { permissions.openSettings(.inputMonitoring) }
                 )
+
+                Text("Then hold **Right ⌘** (or press **⌃⌥D**) in any text field and speak. If the key isn't detected after granting, toggle Murmur off and back on in that System Settings list — macOS sometimes keeps a stale entry after an update.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
             .padding(24)
 

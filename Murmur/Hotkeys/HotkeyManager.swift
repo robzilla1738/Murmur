@@ -4,8 +4,11 @@ import KeyboardShortcuts
 /// KeyboardShortcuts library. Complements `PushToTalkTap`, which handles
 /// modifier-only hold-to-talk that this library can't express.
 extension KeyboardShortcuts.Name {
-    /// Toggle hands-free dictation on/off.
-    static let toggleDictation = Self("toggleDictation")
+    /// Toggle / hold dictation. Ships with a safe default (⌃⌥D) so there's a
+    /// working, discoverable shortcut out of the box in addition to the
+    /// modifier-only push-to-talk key. `default:` only seeds if the user hasn't
+    /// already chosen one.
+    static let toggleDictation = Self("toggleDictation", default: .init(.d, modifiers: [.control, .option]))
     /// Cancel an in-progress dictation.
     static let cancelDictation = Self("cancelDictation")
     /// Toggle Command Mode (voice editing of the current selection).

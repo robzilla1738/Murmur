@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updater: UpdaterController?
     private let scratchpad = ScratchpadController()
     private var settingsWindow: SettingsWindowController?
+    private var rearmTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu-bar agent: no Dock icon, no window at launch.
@@ -38,10 +39,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hud = HUDController(controller: controller, settings: appState.settings)
 
         let ptt = PushToTalkTap(key: appState.settings.pushToTalkKey)
-        ptt.onBegin = { [weak controller] in controller?.begin() }
-        ptt.onEnd = { [weak controller] in controller?.finish() }
+        ptt.onBegin = { [weak controller, weak self] in
+            guard let self else { return }
+            // The modifier key follows the activation mode: hold-to-talk vs toggle.
+            if self.appState.settings.activationMode == .pushToTalk { controller?.begin() } else { controller?.toggle() }
+        }
+        ptt.onEnd = { [weak controller, weak self] in
+            guard let self else { return }
+            if self.appState.settings.activationMode == .pushToTalk { controller?.finish() }
+        }
         pushToTalk = ptt
-        try? ptt.start() // no-op until Accessibility/Input Monitoring are granted
+        armPushToTalk() // keeps retrying until Accessibility/Input Monitoring are granted
 
         let settings = appState.settings
         let hotkeys = HotkeyManager()
@@ -102,6 +110,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.show()
     }
 
+    /// Arm the push-to-talk event tap, retrying until it succeeds. `tapCreate`
+    /// returns nil until Accessibility/Input Monitoring is granted, and a
+    /// menu-bar agent often never "reactivates" after the user flips the toggle
+    /// in System Settings — so we poll for a short while instead of relying only
+    /// on `didBecomeActive`.
+    private func armPushToTalk() {
+        guard let ptt = pushToTalk else { return }
+        if !ptt.isRunning { try? ptt.start() }
+        if ptt.isRunning {
+            rearmTimer?.invalidate()
+            rearmTimer = nil
+            return
+        }
+        guard rearmTimer == nil else { return }
+        rearmTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let ptt = self.pushToTalk else { return }
+                if !ptt.isRunning { try? ptt.start() }
+                if ptt.isRunning {
+                    self.rearmTimer?.invalidate()
+                    self.rearmTimer = nil
+                    Log.hotkey.info("Push-to-talk armed after permission grant")
+                }
+            }
+        }
+    }
+
     /// Revert to a Dock-less agent once the last ordinary window closes.
     private func observeWindowClose() {
         NotificationCenter.default.addObserver(
@@ -143,9 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.appState.permissions.refresh()
-                if let ptt = self.pushToTalk, !ptt.isRunning {
-                    try? ptt.start()
-                }
+                self.armPushToTalk()
             }
         }
     }
