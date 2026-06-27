@@ -133,13 +133,17 @@ public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecke
         // 2. Create transcript with the selected speech model.
         let transcriptID = try await create(audioURL: uploadURL, language: options.language, apiKey: apiKey)
 
-        // 3. Poll until completed.
-        for _ in 0..<120 { // up to ~60s
+        // 3. Poll until completed, bounded by a wall-clock DEADLINE rather than a
+        // fixed iteration count — long audio legitimately takes longer than the
+        // old ~60s budget, which abandoned in-flight transcripts.
+        let deadline = Date().addingTimeInterval(300) // 5 minutes
+        while Date() < deadline {
+            try Task.checkCancellation()
             let (status, text) = try await poll(id: transcriptID, apiKey: apiKey)
             switch status {
             case "completed": return TranscriptionResult(text: (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
             case "error": throw TranscriptionError.network("AssemblyAI transcription failed")
-            default: try? await Task.sleep(for: .milliseconds(500))
+            default: try? await Task.sleep(for: .milliseconds(800))
             }
         }
         throw TranscriptionError.network("AssemblyAI timed out")

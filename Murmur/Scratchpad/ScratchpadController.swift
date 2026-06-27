@@ -9,7 +9,10 @@ final class ScratchpadController {
 
     func toggle() {
         if let window, window.isVisible {
-            window.orderOut(nil)
+            // close() (not orderOut) posts willCloseNotification, which lets
+            // AppDelegate revert the app to a Dock-less .accessory agent. The
+            // window is reused on the next show() (isReleasedWhenClosed = false).
+            window.close()
         } else {
             show()
         }

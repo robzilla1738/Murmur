@@ -80,13 +80,12 @@ public enum AudioDevices {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var size = UInt32(MemoryLayout<CFString>.size)
-        var value: CFString = "" as CFString
-        let status = withUnsafeMutablePointer(to: &value) { ptr -> OSStatus in
-            ptr.withMemoryRebound(to: CFString?.self, capacity: 1) { rebound in
-                AudioObjectGetPropertyData(device, &address, 0, nil, &size, rebound)
-            }
-        }
-        return status == noErr ? (value as String) : nil
+        // The HAL returns a +1-retained CFString (Create rule); take ownership via
+        // `Unmanaged` so it isn't leaked on every enumeration.
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        var value: Unmanaged<CFString>?
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
+        guard status == noErr, let value else { return nil }
+        return value.takeRetainedValue() as String
     }
 }

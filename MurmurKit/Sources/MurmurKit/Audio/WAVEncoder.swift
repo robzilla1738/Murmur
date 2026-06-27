@@ -15,12 +15,16 @@ public enum WAVEncoder {
             let clamped = max(-1, min(1, samples[i]))
             pcm[i] = Int16(clamped * 32_767)
         }
-        let pcmData = pcm.withUnsafeBytes { Data($0) }
-        let dataSize = UInt32(pcmData.count)
 
-        var data = Data(capacity: 44 + pcmData.count)
+        // WAV size fields are 32-bit. Clamp so the Int→UInt32 conversion can't
+        // trap on a pathological multi-hour recording (a >4 GB payload can't be
+        // represented by a WAV header regardless).
+        let byteCount = pcm.count * MemoryLayout<Int16>.size
+        let dataSize = UInt32(min(byteCount, Int(UInt32.max) - 44))
+
+        var data = Data(capacity: 44 + byteCount)
         data.append(ascii: "RIFF")
-        data.append(le: UInt32(36) + dataSize)
+        data.append(le: 36 + dataSize)
         data.append(ascii: "WAVE")
         data.append(ascii: "fmt ")
         data.append(le: UInt32(16))            // PCM fmt chunk size
@@ -32,7 +36,8 @@ public enum WAVEncoder {
         data.append(le: bitsPerSample)
         data.append(ascii: "data")
         data.append(le: dataSize)
-        data.append(pcmData)
+        // Append PCM bytes directly into `data` — no intermediate Data copy.
+        pcm.withUnsafeBytes { data.append(contentsOf: $0) }
         return data
     }
 }

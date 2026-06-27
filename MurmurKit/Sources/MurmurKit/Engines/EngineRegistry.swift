@@ -11,8 +11,14 @@ public final class EngineRegistry {
     /// One prepared transcription engine shared by Settings ("Download & load")
     /// and the dictation pipeline, so warming the model once benefits both.
     private var prepared: (key: String, engine: any TranscriptionEngine)?
-    /// In-flight prepare, so concurrent callers await the same work.
-    private var preparing: (key: String, task: Task<any TranscriptionEngine, Error>)?
+    /// In-flight prepare, so concurrent callers await the same work. Tracked with
+    /// a `token` so bookkeeping keys on task IDENTITY, not the (recurring) key.
+    private var preparing: (key: String, token: Int, task: Task<any TranscriptionEngine, Error>)?
+    /// Bumped whenever the desired engine/model changes (`resetPreparedEngine`). A
+    /// prepare begun under a stale epoch must not populate the cache.
+    private var epoch = 0
+    /// Monotonic id handed to each in-flight prepare.
+    private var nextToken = 0
 
     public init(settings: AppSettings, keychain: KeychainStore) {
         self.settings = settings
@@ -45,31 +51,42 @@ public final class EngineRegistry {
         if let prepared, prepared.key == key { progress(1); return prepared.engine }
         if let preparing, preparing.key == key { return try await preparing.task.value }
 
-        // Switching engine/model — drop the old one.
-        if let old = prepared { await old.engine.unload(); self.prepared = nil }
+        // Switching engine/model — drop the old one. Unload OFF this task (no
+        // await here) so `preparing` is established synchronously: on the main
+        // actor the whole prologue is then atomic and a concurrent caller can't
+        // slip through a dedup gap while we await an unload.
+        if let old = prepared {
+            prepared = nil
+            Task { await old.engine.unload() }
+        }
 
+        let startEpoch = epoch
+        nextToken += 1
+        let token = nextToken
         let engine = try makeTranscriptionEngine()
         let model = currentTranscriptionModel()
         let task = Task<any TranscriptionEngine, Error> {
             try await engine.prepare(model: model, progress: progress)
             return engine
         }
-        preparing = (key, task)
-        defer { if preparing?.key == key { preparing = nil } }
+        preparing = (key, token, task)
+        defer { if preparing?.token == token { preparing = nil } }
 
-        do {
-            let ready = try await task.value
+        let ready = try await task.value
+        // Only cache if nothing invalidated this prepare meanwhile. The prepare
+        // body isn't cancellation-aware, so a `resetPreparedEngine` can't stop the
+        // download/load — but it bumps `epoch`, and we then refuse to cache the
+        // now-stale result under the old key (the caller still gets it for this
+        // one use; ARC reclaims it afterwards).
+        if epoch == startEpoch, currentKey() == key {
             prepared = (key, ready)
-            return ready
-        } catch {
-            // Leave nothing cached so the next attempt retries cleanly.
-            if prepared?.key == key { prepared = nil }
-            throw error
         }
+        return ready
     }
 
     /// Drop any prepared/in-flight engine (e.g. when the user changes engine/model).
     public func resetPreparedEngine() {
+        epoch += 1
         let old = prepared
         prepared = nil
         preparing?.task.cancel()

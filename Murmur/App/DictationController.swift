@@ -44,7 +44,11 @@ final class DictationController {
     private var autoStop = false
     private var silenceStart: Date?
     private var hasSpoken = false
-    private let silenceThreshold: Float = 0.06
+    /// Silence cutoff on the *compressed* level scale (`min(1, sqrt(rms)*2.5)`
+    /// from AudioCaptureEngine). Typical room ambient compresses to ~0.05–0.11
+    /// and speech to ~0.3–1.0; 0.15 sits cleanly between so hands-free actually
+    /// auto-stops on real silence (0.06 was below the ambient floor and never fired).
+    private let silenceThreshold: Float = 0.15
     private let silenceTimeout: TimeInterval = 2.0
 
     /// SwiftData context for History (set by `AppDelegate`).
@@ -391,6 +395,9 @@ final class DictationController {
         errorResetTask?.cancel()
         errorResetTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(6))
+            // If this task was superseded (another error scheduled a new reset),
+            // don't fire — otherwise the cancelled task clears the NEW error early.
+            guard !Task.isCancelled else { return }
             if case .error = self?.state { self?.state = .idle }
         }
     }

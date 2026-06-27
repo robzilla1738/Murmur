@@ -34,12 +34,16 @@ final class TextInsertionService {
         let snapshot = currentSnapshot()
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        // The pasteboard state we expect to still see at restore time. If it has
+        // advanced, the user (or an app) copied something new during the window —
+        // we must NOT clobber it with the old snapshot.
+        let expectedChangeCount = pasteboard.changeCount
 
         synthesizePaste()
 
-        Task { [restoreDelay] in
+        Task { [restoreDelay, expectedChangeCount] in
             try? await Task.sleep(for: restoreDelay)
-            restore(snapshot)
+            restore(snapshot, ifChangeCountIs: expectedChangeCount)
         }
     }
 
@@ -77,7 +81,11 @@ final class TextInsertionService {
         return Snapshot(items: items)
     }
 
-    private func restore(_ snapshot: Snapshot) {
+    /// Restore a snapshot. When `expected` is given, restore only if the
+    /// pasteboard hasn't changed since — so a copy the user made while the paste
+    /// was in flight is preserved rather than overwritten.
+    private func restore(_ snapshot: Snapshot, ifChangeCountIs expected: Int? = nil) {
+        if let expected, pasteboard.changeCount != expected { return }
         pasteboard.clearContents()
         guard !snapshot.items.isEmpty else { return }
         let items = snapshot.items.map { dict -> NSPasteboardItem in

@@ -6,8 +6,11 @@ import WhisperKit
 ///
 /// A `final class @unchecked Sendable` rather than an actor: `WhisperKit` is a
 /// non-Sendable `open class`, so invoking it from an actor trips the Swift 6
-/// "sending" check. The dictation pipeline serializes prepare → transcribe, so
-/// access to `whisperKit` is single-threaded in practice.
+/// "sending" check. Instead, the loaded model is guarded by an `NSLock` (the same
+/// pattern as `AudioCaptureEngine`): `transcribe` reads it into a local strong
+/// reference, so a concurrent `unload()` — issued by `EngineRegistry` when the
+/// user switches engines mid-transcription — can clear the slot without racing
+/// the in-flight transcription, which keeps its own reference until it returns.
 ///
 /// Note: WhisperKit also defines a `TranscriptionResult`, so our type is
 /// qualified as `MurmurKit.TranscriptionResult` here to disambiguate.
@@ -15,7 +18,15 @@ public final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
     public let id = TranscriptionEngineID.whisperKit
 
     private let modelName: String
-    private var whisperKit: WhisperKit?
+    private let lock = NSLock()
+    private var _whisperKit: WhisperKit?
+
+    /// Lock-guarded accessor for the loaded model. The lock is only ever held for
+    /// the synchronous load/store, never across an `await`.
+    private var whisperKit: WhisperKit? {
+        get { lock.lock(); defer { lock.unlock() }; return _whisperKit }
+        set { lock.lock(); defer { lock.unlock() }; _whisperKit = newValue }
+    }
 
     public init(model: TranscriptionModel) {
         self.modelName = model.id
@@ -35,8 +46,9 @@ public final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
             variant: model.id,
             downloadBase: ModelStorage.whisperKitDirectory,
             progressCallback: { p in
-                // Reserve the top slice for the CoreML compile/load step below.
-                progress(max(0.01, p.fractionCompleted * 0.9))
+                // Reserve the top slice for the CoreML compile/load step below,
+                // and clamp into 0.01…0.9 (aggregated child Progress can overshoot).
+                progress(min(0.9, max(0.01, p.fractionCompleted * 0.9)))
             }
         )
 

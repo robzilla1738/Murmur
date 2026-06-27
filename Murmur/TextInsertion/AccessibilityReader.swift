@@ -22,8 +22,10 @@ final class AccessibilityReader {
         let system = AXUIElementCreateSystemWide()
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-              let focused else { return nil }
+              let focused,
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
 
+        // Safe: the type was just verified above.
         let element = focused as! AXUIElement
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success,

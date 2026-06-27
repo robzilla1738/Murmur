@@ -81,8 +81,11 @@ public struct AnthropicProvider: LLMProvider {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.httpBody = try JSONEncoder().encode(Request(
+            // Anthropic requires max_tokens. Default generously so polished /
+            // rewritten dictation isn't silently truncated mid-sentence (the
+            // old 1024 cap cut off a few minutes of speech). Callers may override.
             model: model.id,
-            max_tokens: options.maxTokens ?? 1024,
+            max_tokens: options.maxTokens ?? 8192,
             system: system.isEmpty ? nil : system,
             temperature: options.temperature,
             messages: turns

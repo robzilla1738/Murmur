@@ -25,7 +25,7 @@ public actor ParakeetEngine: TranscriptionEngine {
 
         let models = try await AsrModels.downloadAndLoad(
             version: version,
-            progressHandler: { p in progress(p.fractionCompleted) }
+            progressHandler: { p in progress(min(1, max(0, p.fractionCompleted))) }
         )
         let manager = AsrManager()
         try await manager.loadModels(models)

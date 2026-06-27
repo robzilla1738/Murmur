@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let scratchpad = ScratchpadController()
     private var settingsWindow: SettingsWindowController?
     private var rearmTimer: Timer?
+    private var rearmAttempts = 0
+    private let maxRearmAttempts = 15   // ~30s of 2s polls, then wait for reactivation
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu-bar agent: no Dock icon, no window at launch.
@@ -142,15 +144,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             rearmTimer = nil
             return
         }
+        // Not armed (permission missing). Poll briefly, then GIVE UP until the next
+        // app reactivation (observeReactivation re-invokes armPushToTalk) — so we
+        // don't run a 2s timer for the whole session when Input Monitoring is
+        // intentionally not granted (the ⌃⌥D combo works without it).
         guard rearmTimer == nil else { return }
+        rearmAttempts = 0
         rearmTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, let ptt = self.pushToTalk else { return }
+                self.rearmAttempts += 1
                 if !ptt.isRunning { try? ptt.start() }
                 if ptt.isRunning {
                     self.rearmTimer?.invalidate()
                     self.rearmTimer = nil
                     Log.hotkey.info("Push-to-talk armed after permission grant")
+                } else if self.rearmAttempts >= self.maxRearmAttempts {
+                    self.rearmTimer?.invalidate()
+                    self.rearmTimer = nil
+                    Log.hotkey.info("Stopped polling for push-to-talk; will retry when Murmur is reactivated")
                 }
             }
         }

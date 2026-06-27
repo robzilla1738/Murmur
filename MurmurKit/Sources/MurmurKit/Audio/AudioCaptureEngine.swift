@@ -44,6 +44,12 @@ public final class AudioCaptureEngine: @unchecked Sendable {
     private var converter: AVAudioConverter?
     private var levelHandler: (@Sendable (Float) -> Void)?
     private var isRunning = false
+    private var didHitCap = false
+
+    /// Hard cap on retained audio (~15 min at 16 kHz) so a forgotten or
+    /// toggled-on recording can't grow memory without bound. Audio past the cap
+    /// is dropped; far beyond any real single dictation.
+    private let maxSamples = 16_000 * 60 * 15
 
     public init() {
         // Force-unwrap is safe: this is a standard, always-available format.
@@ -73,6 +79,7 @@ public final class AudioCaptureEngine: @unchecked Sendable {
         lock.lock()
         samples.removeAll(keepingCapacity: true)
         levelHandler = onLevel
+        didHitCap = false
         lock.unlock()
 
         let input = engine.inputNode
@@ -164,11 +171,23 @@ public final class AudioCaptureEngine: @unchecked Sendable {
         vDSP_rmsqv(channel, 1, &rms, vDSP_Length(frameCount))
         let level = min(1, sqrt(rms) * 2.5)
 
+        // Re-check isRunning under the lock: stop() may have run during the
+        // (lock-free) conversion above, in which case this buffer must not land
+        // in the freshly-cleared array.
         lock.lock()
-        samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: frameCount))
-        let handler = levelHandler
+        var hitCap = false
+        if isRunning {
+            if samples.count < maxSamples {
+                samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: frameCount))
+            } else if !didHitCap {
+                didHitCap = true
+                hitCap = true
+            }
+        }
+        let handler = isRunning ? levelHandler : nil
         lock.unlock()
 
+        if hitCap { Log.audio.warning("Capture buffer hit the \(self.maxSamples / 16_000)s cap; dropping further audio") }
         handler?(level)
     }
 

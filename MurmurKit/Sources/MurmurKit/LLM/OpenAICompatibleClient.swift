@@ -23,7 +23,13 @@ public struct OpenAICompatibleClient: Sendable {
         var request = URLRequest(url: url)
         authorize(&request)
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else { return [] }
+        // Surface the real failure (bad key, wrong endpoint, server error) instead
+        // of failing open with [] — an empty list reads as "no models" and hides
+        // the misconfiguration. Cloud callers catch this and fall back to the catalog.
+        guard let http = response as? HTTPURLResponse else { throw LLMError.network("No HTTP response") }
+        guard 200..<300 ~= http.statusCode else {
+            throw LLMError.http(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
+        }
         let decoded = try JSONDecoder().decode(ModelList.self, from: data)
         return decoded.data.map { LLMModel(id: $0.id) }
     }
@@ -64,9 +70,15 @@ public struct OpenAICompatibleClient: Sendable {
                         let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
                         if payload == "[DONE]" { break }
                         guard let data = payload.data(using: .utf8) else { continue }
-                        if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
-                           let delta = chunk.choices.first?.delta.content, !delta.isEmpty {
-                            continuation.yield(delta)
+                        do {
+                            let chunk = try JSONDecoder().decode(StreamChunk.self, from: data)
+                            if let delta = chunk.choices.first?.delta.content, !delta.isEmpty {
+                                continuation.yield(delta)
+                            }
+                        } catch {
+                            // Don't silently drop content: a chunk we can't parse may
+                            // carry text. Log it so token loss is diagnosable.
+                            Log.llm.debug("Skipped unparseable stream chunk: \(error.localizedDescription, privacy: .public)")
                         }
                     }
                     continuation.finish()
