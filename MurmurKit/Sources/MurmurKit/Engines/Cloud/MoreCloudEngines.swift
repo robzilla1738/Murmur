@@ -109,11 +109,13 @@ public final class ElevenLabsTranscriptionEngine: TranscriptionEngine, @unchecke
 public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecked Sendable {
     public let id = TranscriptionEngineID.assemblyAI
     private let apiKey: String?
+    private let modelID: String
     private let session = URLSession(configuration: .ephemeral)
     private let base = "https://api.assemblyai.com/v2"
 
     public init(apiKey: String?, modelID: String) {
         self.apiKey = apiKey
+        self.modelID = modelID
     }
 
     public func prepare(model: TranscriptionModel, progress: @Sendable @escaping (Double) -> Void) async throws {
@@ -128,7 +130,7 @@ public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecke
         // 1. Upload audio bytes.
         let uploadURL = try await upload(WAVEncoder.encode(samples: samples), apiKey: apiKey)
 
-        // 2. Create transcript.
+        // 2. Create transcript with the selected speech model.
         let transcriptID = try await create(audioURL: uploadURL, language: options.language, apiKey: apiKey)
 
         // 3. Poll until completed.
@@ -159,7 +161,13 @@ public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecke
         request.httpMethod = "POST"
         request.setValue(apiKey, forHTTPHeaderField: "authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(CreateRequest(audio_url: audioURL, language_code: language))
+        // Current API: `speech_models` (array) — the single `speech_model` string
+        // is deprecated. We pass the selected flagship (e.g. universal-3-pro)
+        // with universal-2 as a broad-language fallback.
+        let models = modelID.isEmpty ? nil : (modelID == "universal-2" ? [modelID] : [modelID, "universal-2"])
+        request.httpBody = try JSONEncoder().encode(
+            CreateRequest(audio_url: audioURL, language_code: language, speech_models: models)
+        )
         let (respData, response) = try await session.data(for: request)
         try DeepgramTranscriptionEngine.checkStatus(response, respData, id)
         return try JSONDecoder().decode(CreateResponse.self, from: respData).id
@@ -175,7 +183,11 @@ public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecke
     }
 
     private struct UploadResponse: Decodable { let upload_url: String }
-    private struct CreateRequest: Encodable { let audio_url: String; let language_code: String? }
+    private struct CreateRequest: Encodable {
+        let audio_url: String
+        let language_code: String?
+        let speech_models: [String]?
+    }
     private struct CreateResponse: Decodable { let id: String }
     private struct PollResponse: Decodable { let status: String; let text: String? }
 }
