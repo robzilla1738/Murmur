@@ -39,28 +39,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hud = HUDController(controller: controller, settings: appState.settings)
 
         let ptt = PushToTalkTap(key: appState.settings.pushToTalkKey)
+        // The modifier key is the hold-to-talk path (push-to-talk) or a toggle in
+        // hands-free mode — see InputRouting.
         ptt.onBegin = { [weak controller, weak self] in
-            guard let self else { return }
-            // The modifier key follows the activation mode: hold-to-talk vs toggle.
-            if self.appState.settings.activationMode == .pushToTalk { controller?.begin() } else { controller?.toggle() }
+            guard let self, let controller else { return }
+            self.apply(InputRouting.onDown(.modifier, mode: self.appState.settings.activationMode), to: controller)
         }
         ptt.onEnd = { [weak controller, weak self] in
-            guard let self else { return }
-            if self.appState.settings.activationMode == .pushToTalk { controller?.finish() }
+            guard let self, let controller else { return }
+            self.apply(InputRouting.onUp(.modifier, mode: self.appState.settings.activationMode), to: controller)
         }
         pushToTalk = ptt
         armPushToTalk() // keeps retrying until Accessibility/Input Monitoring are granted
 
-        let settings = appState.settings
         let hotkeys = HotkeyManager()
-        hotkeys.onDictationDown = { [weak controller] in
-            guard let controller else { return }
-            // Hold-to-talk vs tap-to-toggle per the activation mode.
-            if settings.activationMode == .pushToTalk { controller.begin() } else { controller.toggle() }
+        // The ⌃⌥D combo is a discrete tap — it always toggles (tap to start, tap to
+        // stop), independent of activation mode, so it works without Input Monitoring.
+        hotkeys.onDictationDown = { [weak controller, weak self] in
+            guard let self, let controller else { return }
+            self.apply(InputRouting.onDown(.combo, mode: self.appState.settings.activationMode), to: controller)
         }
-        hotkeys.onDictationUp = { [weak controller] in
-            guard let controller else { return }
-            if settings.activationMode == .pushToTalk { controller.finish() }
+        hotkeys.onDictationUp = { [weak controller, weak self] in
+            guard let self, let controller else { return }
+            self.apply(InputRouting.onUp(.combo, mode: self.appState.settings.activationMode), to: controller)
         }
         hotkeys.onCancel = { [weak controller] in controller?.cancel() }
         hotkeys.onCommandMode = { [weak controller] in controller?.toggleCommand() }
@@ -108,6 +109,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// showSettingsWindow: don't open for a menu-bar agent).
     func presentSettings() {
         settingsWindow?.show()
+    }
+
+    /// Apply a routed dictation action to the controller.
+    private func apply(_ action: DictationAction, to controller: DictationController) {
+        switch action {
+        case .begin: controller.begin()
+        case .finish: controller.finish()
+        case .toggle: controller.toggle()
+        case .ignore: break
+        }
     }
 
     /// Arm the push-to-talk event tap, retrying until it succeeds. `tapCreate`

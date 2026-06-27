@@ -16,7 +16,9 @@ final class OnboardingController {
     /// Show onboarding on first launch, or whenever required permissions are missing.
     func showIfNeeded() {
         let completed = UserDefaults.standard.bool(forKey: completionKey)
-        if !completed || !appState.permissions.allGranted {
+        // Only the core permissions (mic + accessibility) gate re-showing onboarding;
+        // Input Monitoring is optional (just for the hold key), so we don't nag for it.
+        if !completed || !appState.permissions.coreGranted {
             show()
         }
     }
@@ -34,7 +36,7 @@ final class OnboardingController {
             self?.finish()
         }
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 660),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false

@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import MurmurKit
 import Observation
 import SwiftData
@@ -98,6 +99,15 @@ final class DictationController {
 
     private func startRecording(mode: Mode, autoStop: Bool) {
         guard state == .idle else { return }
+
+        // Surface a denied mic instead of silently recording silence. `.notDetermined`
+        // still proceeds — AVAudioEngine.start() triggers the first-run system prompt.
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        if micStatus == .denied || micStatus == .restricted {
+            fail(TranscriptionError.unsupported("Microphone access is off for Murmur. Turn it on in System Settings → Privacy & Security → Microphone."))
+            return
+        }
+
         self.mode = mode
         self.autoStop = autoStop
         silenceStart = nil
@@ -180,9 +190,16 @@ final class DictationController {
             // Literal dictionary replacements + snippet expansions.
             text = TextProcessing.applyReplacements(text, vocab.replacements + vocab.snippets)
 
+            // Always save the transcript first, so it's never lost if paste can't run.
+            recordHistory(raw: raw, final: text, duration: duration)
+            guard insertion.isTrusted else {
+                insertion.copyToClipboard(text)
+                state = .error("Enable Accessibility for Murmur, then press ⌘V — your text is on the clipboard.")
+                scheduleErrorReset()
+                return
+            }
             state = .inserting
             insertion.insert(text)
-            recordHistory(raw: raw, final: text, duration: duration)
             state = .idle
         } catch {
             fail(error)
@@ -226,8 +243,8 @@ final class DictationController {
     /// Shared rewrite path for Transforms and Command Mode. Reads the selection
     /// (preferring an already-captured one), rewrites it, and pastes the result.
     private func applyRewrite(instruction: String, spokenSelection: String?) async {
-        guard let model = registry.currentLLMModel() else {
-            state = .error("Select an AI model in Settings → AI Polish to use this.")
+        guard registry.canPolish, let model = registry.currentLLMModel() else {
+            state = .error("Add an AI provider in Settings → AI Polish to use this — set a provider key, or run LM Studio/Ollama.")
             scheduleErrorReset()
             return
         }
@@ -240,6 +257,12 @@ final class DictationController {
         do {
             let output = try await rewrite.rewrite(instruction: instruction, selection: selection, provider: provider, model: model)
             guard !output.isEmpty else { state = .idle; return }
+            guard insertion.isTrusted else {
+                insertion.copyToClipboard(output)
+                state = .error("Enable Accessibility for Murmur, then press ⌘V — your result is on the clipboard.")
+                scheduleErrorReset()
+                return
+            }
             state = .inserting
             insertion.insert(output)
             state = .idle
@@ -280,7 +303,9 @@ final class DictationController {
 
     /// Run AI cleanup; on failure, fall back to the raw transcript.
     private func polished(_ raw: String, terms: [String]) async -> String {
-        guard let model = registry.currentLLMModel() else { return raw }
+        // No usable LLM (no key, no local server) → skip the call entirely and
+        // insert the raw transcript instead of paying for a guaranteed-failing request.
+        guard registry.canPolish, let model = registry.currentLLMModel() else { return raw }
         let provider = registry.makeLLMProvider()
         let context = PolishContext(
             frontmostAppName: targetApp?.name,
@@ -341,7 +366,7 @@ final class DictationController {
     private func scheduleErrorReset() {
         errorResetTask?.cancel()
         errorResetTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(6))
             if case .error = self?.state { self?.state = .idle }
         }
     }

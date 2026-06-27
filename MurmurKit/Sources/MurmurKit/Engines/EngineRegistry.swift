@@ -118,6 +118,15 @@ public final class EngineRegistry {
         }
     }
 
+    /// Whether AI Polish / rewrites can actually run: a local provider
+    /// (LM Studio/Ollama) or a cloud provider with a stored API key. Lets the
+    /// pipeline skip a guaranteed-failing network call when no key is set.
+    public var canPolish: Bool {
+        let id = settings.llmProviderID
+        if id.isLocal { return true }
+        return keychain.hasValue(for: id.keychainAccount)
+    }
+
     public func currentLLMModel() -> LLMModel? {
         let id = settings.llmProviderID
         guard let modelID = settings.selectedLLMModelID(for: id) else { return nil }

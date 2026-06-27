@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 /// Inserts text into whatever app currently has keyboard focus, by putting the
 /// text on the pasteboard and synthesizing ⌘V, then restoring the previous
@@ -14,6 +15,18 @@ final class TextInsertionService {
     /// How long to wait after pasting before restoring the old clipboard, giving
     /// the target app time to read the pasteboard.
     private let restoreDelay: Duration = .milliseconds(250)
+
+    /// Whether we're allowed to synthesize keystrokes. Without Accessibility the
+    /// synthetic ⌘V is a silent no-op, so the caller must check this and fall back.
+    var isTrusted: Bool { AXIsProcessTrusted() }
+
+    /// Put text on the clipboard without pasting or restoring — the fallback when
+    /// Accessibility isn't granted, so the user can paste it manually with ⌘V.
+    func copyToClipboard(_ text: String) {
+        guard !text.isEmpty else { return }
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
 
     func insert(_ text: String) {
         guard !text.isEmpty else { return }
@@ -81,12 +94,17 @@ final class TextInsertionService {
     private func synthesizeCopy() { synthesize(keyCode: 0x08) }  // C
 
     private func synthesize(keyCode: CGKeyCode) {
-        let source = CGEventSource(stateID: .combinedSessionState)
+        // A *private* event source: the synthetic ⌘V reports only the Command flag
+        // and ignores any physical modifier still held (e.g. the push-to-talk key
+        // or ⌃⌥ from the toggle combo), which would otherwise corrupt the keystroke.
+        let source = CGEventSource(stateID: .privateState)
         let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
         down?.flags = .maskCommand
         let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
         up?.flags = .maskCommand
         down?.post(tap: .cgAnnotatedSessionEventTap)
+        // A brief gap between down and up — some apps drop a zero-duration ⌘V.
+        usleep(1500)
         up?.post(tap: .cgAnnotatedSessionEventTap)
     }
 }

@@ -20,9 +20,11 @@ final class PermissionsManager {
     private(set) var accessibility: PermissionStatus = .notDetermined
     private(set) var inputMonitoring: PermissionStatus = .notDetermined
 
-    /// Everything required for the core dictation loop.
-    var allGranted: Bool {
-        microphone.isGranted && accessibility.isGranted && inputMonitoring.isGranted
+    /// The minimum needed for the core loop: record (mic) + paste (accessibility).
+    /// The ⌃⌥D toggle works with just these — Input Monitoring is only for the
+    /// modifier hold key, so it's not required here.
+    var coreGranted: Bool {
+        microphone.isGranted && accessibility.isGranted
     }
 
     init() {

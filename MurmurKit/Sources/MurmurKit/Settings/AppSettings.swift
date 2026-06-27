@@ -68,8 +68,11 @@ public final class AppSettings {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
+        // Default to on-device Parakeet so transcription works out of the box with
+        // no API key — the model downloads once (no TCC location), then runs fully
+        // offline. Cloud engines require a key the user hasn't set on first run.
         self.transcriptionEngineID = defaults.string(forKey: Keys.transcriptionEngineID)
-            .flatMap(TranscriptionEngineID.init(rawValue:)) ?? .openAI
+            .flatMap(TranscriptionEngineID.init(rawValue:)) ?? .parakeet
         self.polishEnabled = defaults.object(forKey: Keys.polishEnabled) as? Bool ?? true
         self.llmProviderID = defaults.string(forKey: Keys.llmProviderID)
             .flatMap(LLMProviderID.init(rawValue:)) ?? .openAI

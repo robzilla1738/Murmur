@@ -64,6 +64,38 @@ func whisperKitTranscribesRealAudio() async throws {
             "transcript didn't contain expected words: \(result.text)")
 }
 
+/// Out-of-the-box regression: with the *shipping defaults* and an *empty* keychain
+/// (no API keys anywhere), the default engine must be on-device AND actually
+/// transcribe. This is the exact "fresh install" the user hit where nothing worked.
+/// Gated (downloads the model on first run).
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MURMUR_LIVE_ASR"] == "1"))
+@MainActor
+func defaultEngineTranscribesWithNoAPIKeys() async throws {
+    // Fresh UserDefaults so we exercise the shipping DEFAULT, not a persisted choice.
+    let suite = "murmur.tests.ootb"
+    let defaults = UserDefaults(suiteName: suite)!
+    defaults.removePersistentDomain(forName: suite)
+    let settings = AppSettings(defaults: defaults)
+
+    // The default engine must run on-device (works with zero API keys).
+    #expect(settings.transcriptionEngineID.isLocal,
+            "default engine should be on-device, got \(settings.transcriptionEngineID.rawValue)")
+
+    // A throwaway keychain service guarantees no stored API keys.
+    let keychain = KeychainStore(service: "com.murmur.tests.ootb-empty")
+    let registry = EngineRegistry(settings: settings, keychain: keychain)
+
+    let path = ProcessInfo.processInfo.environment["MURMUR_LIVE_WAV"] ?? "/tmp/murmur_test.wav"
+    let samples = try loadMonoFloat16k(URL(fileURLWithPath: path))
+    #expect(samples.count > 16_000, "expected >1s of audio, got \(samples.count) samples")
+
+    let engine = try await registry.preparedTranscriptionEngine()
+    let result = try await engine.transcribe(samples: samples, options: TranscriptionOptions(language: "en"))
+    print("OOTB ASR (\(settings.transcriptionEngineID.rawValue)): \(result.text)")
+    #expect(!result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            "the default engine produced no text with no API key set")
+}
+
 /// Thread-safe max-progress tracker for the `@Sendable` progress callback.
 private final class MaxProgress: @unchecked Sendable {
     private let lock = NSLock()
