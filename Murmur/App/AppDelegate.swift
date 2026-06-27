@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var rearmTimer: Timer?
     private var rearmAttempts = 0
     private let maxRearmAttempts = 15   // ~30s of 2s polls, then wait for reactivation
+    /// True only when the tap was created WHILE Input Monitoring was granted, i.e.
+    /// it actually delivers events globally (not just while Murmur is frontmost).
+    private var armedWithMonitoring = false
+    private var didPromptForInputMonitoring = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu-bar agent: no Dock icon, no window at launch.
@@ -125,47 +129,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Arm the push-to-talk event tap, retrying until it succeeds. `tapCreate`
-    /// returns nil until Accessibility/Input Monitoring is granted, and a
-    /// menu-bar agent often never "reactivates" after the user flips the toggle
-    /// in System Settings — so we poll for a short while instead of relying only
-    /// on `didBecomeActive`.
+    /// Arm the Right ⌘ (modifier) push-to-talk tap.
+    ///
+    /// Critical macOS subtlety: `CGEvent.tapCreate` SUCCEEDS even without Input
+    /// Monitoring — but the resulting tap then only sees events while Murmur is
+    /// frontmost (it never fires for the global hold-to-talk use case). So we gate
+    /// "armed" on the Input Monitoring permission itself, and because TCC is
+    /// evaluated at tap-creation time, we RECREATE the tap once the permission is
+    /// granted. The ⌃⌥D combo (a Carbon hotkey) needs none of this and works
+    /// regardless.
     private func armPushToTalk() {
         guard let ptt = pushToTalk else { return }
-        if !ptt.isRunning {
-            do {
-                try ptt.start()
-            } catch {
-                Log.hotkey.error("Push-to-talk tap could NOT arm: \(error, privacy: .public) — grant Accessibility + Input Monitoring to the modifier key. (⌃⌥D works without these.)")
+        appState.permissions.refresh()
+        let perms = appState.permissions
+        Log.hotkey.info("Permissions — Accessibility=\(perms.accessibility.isGranted), InputMonitoring=\(perms.inputMonitoring.isGranted)")
+
+        if perms.inputMonitoring.isGranted {
+            if !armedWithMonitoring {
+                // Recreate so the tap is made WITH the permission → global delivery.
+                ptt.stop()
+                do {
+                    try ptt.start()
+                    armedWithMonitoring = true
+                    Log.hotkey.info("Push-to-talk armed (Input Monitoring granted, global)")
+                } catch {
+                    Log.hotkey.error("Push-to-talk tap could NOT arm: \(error, privacy: .public)")
+                }
             }
+        } else {
+            // Without Input Monitoring the tap would only fire while Murmur is
+            // frontmost — tear it down and guide the user to enable it.
+            ptt.stop()
+            armedWithMonitoring = false
+            promptForInputMonitoringIfNeeded()
         }
-        if ptt.isRunning {
+
+        if armedWithMonitoring {
             rearmTimer?.invalidate()
             rearmTimer = nil
-            return
+        } else {
+            startRearmPolling()
         }
-        // Not armed (permission missing). Poll briefly, then GIVE UP until the next
-        // app reactivation (observeReactivation re-invokes armPushToTalk) — so we
-        // don't run a 2s timer for the whole session when Input Monitoring is
-        // intentionally not granted (the ⌃⌥D combo works without it).
+    }
+
+    /// Poll briefly for the Input Monitoring grant (covers the user enabling it
+    /// while Murmur is backgrounded, when `didBecomeActive` may not fire), then
+    /// give up until the next reactivation so we don't poll forever.
+    private func startRearmPolling() {
         guard rearmTimer == nil else { return }
         rearmAttempts = 0
         rearmTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, let ptt = self.pushToTalk else { return }
+                guard let self else { return }
                 self.rearmAttempts += 1
-                if !ptt.isRunning { try? ptt.start() }
-                if ptt.isRunning {
+                self.armPushToTalk()   // re-checks permission; arms + invalidates when granted
+                if !self.armedWithMonitoring, self.rearmAttempts >= self.maxRearmAttempts {
                     self.rearmTimer?.invalidate()
                     self.rearmTimer = nil
-                    Log.hotkey.info("Push-to-talk armed after permission grant")
-                } else if self.rearmAttempts >= self.maxRearmAttempts {
-                    self.rearmTimer?.invalidate()
-                    self.rearmTimer = nil
-                    Log.hotkey.info("Stopped polling for push-to-talk; will retry when Murmur is reactivated")
+                    Log.hotkey.info("Stopped polling for Input Monitoring; will retry on reactivation")
                 }
             }
         }
+    }
+
+    /// Show the Input Monitoring prompt once so the user can enable the Right ⌘
+    /// hold key (the system only surfaces it while the status is undetermined).
+    private func promptForInputMonitoringIfNeeded() {
+        guard !didPromptForInputMonitoring else { return }
+        didPromptForInputMonitoring = true
+        appState.permissions.requestInputMonitoring()
+        Log.hotkey.info("Requested Input Monitoring for the Right ⌘ hold key")
     }
 
     /// Revert to a Dock-less agent once the last ordinary window closes.

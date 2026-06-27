@@ -37,7 +37,7 @@ struct OnboardingView: View {
                 PermissionRow(
                     icon: "keyboard",
                     title: "Input Monitoring",
-                    description: "Optional — only for the hold-to-talk key (Right ⌘). ⌃⌥D works without it.",
+                    description: "Needed for the Right ⌘ hold-to-talk key. (The ⌃⌥D shortcut works without it.)",
                     status: permissions.inputMonitoring,
                     action: { permissions.requestInputMonitoring() },
                     openSettings: { permissions.openSettings(.inputMonitoring) }
