@@ -43,10 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // hands-free mode — see InputRouting.
         ptt.onBegin = { [weak controller, weak self] in
             guard let self, let controller else { return }
+            Log.hotkey.info("Modifier key DOWN (\(self.appState.settings.pushToTalkKey.rawValue, privacy: .public))")
             self.apply(InputRouting.onDown(.modifier, mode: self.appState.settings.activationMode), to: controller)
         }
         ptt.onEnd = { [weak controller, weak self] in
             guard let self, let controller else { return }
+            Log.hotkey.info("Modifier key UP")
             self.apply(InputRouting.onUp(.modifier, mode: self.appState.settings.activationMode), to: controller)
         }
         pushToTalk = ptt
@@ -114,9 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Apply a routed dictation action to the controller.
     private func apply(_ action: DictationAction, to controller: DictationController) {
         switch action {
-        case .begin: controller.begin()
-        case .finish: controller.finish()
-        case .toggle: controller.toggle()
+        case .begin: Log.hotkey.info("→ begin"); controller.begin()
+        case .finish: Log.hotkey.info("→ finish"); controller.finish()
+        case .toggle: Log.hotkey.info("→ toggle"); controller.toggle()
         case .ignore: break
         }
     }
@@ -128,7 +130,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// on `didBecomeActive`.
     private func armPushToTalk() {
         guard let ptt = pushToTalk else { return }
-        if !ptt.isRunning { try? ptt.start() }
+        if !ptt.isRunning {
+            do {
+                try ptt.start()
+            } catch {
+                Log.hotkey.error("Push-to-talk tap could NOT arm: \(error, privacy: .public) — grant Accessibility + Input Monitoring to the modifier key. (⌃⌥D works without these.)")
+            }
+        }
         if ptt.isRunning {
             rearmTimer?.invalidate()
             rearmTimer = nil

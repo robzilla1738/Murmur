@@ -1,4 +1,5 @@
 import KeyboardShortcuts
+import MurmurKit
 
 /// User-customizable global shortcuts (normal key + modifier combos) via the
 /// KeyboardShortcuts library. Complements `PushToTalkTap`, which handles
@@ -32,7 +33,12 @@ final class HotkeyManager {
     var onTransform: (@MainActor (Int) -> Void)?
 
     func register() {
-        KeyboardShortcuts.onKeyDown(for: .toggleDictation) { [weak self] in self?.onDictationDown?() }
+        let shortcut = KeyboardShortcuts.getShortcut(for: .toggleDictation)
+        Log.hotkey.info("Registering hotkeys; toggleDictation = \(shortcut.map(String.init(describing:)) ?? "nil", privacy: .public)")
+        KeyboardShortcuts.onKeyDown(for: .toggleDictation) { [weak self] in
+            Log.hotkey.info("⌃⌥D keyDown received")
+            self?.onDictationDown?()
+        }
         KeyboardShortcuts.onKeyUp(for: .toggleDictation) { [weak self] in self?.onDictationUp?() }
         KeyboardShortcuts.onKeyDown(for: .cancelDictation) { [weak self] in self?.onCancel?() }
         KeyboardShortcuts.onKeyDown(for: .commandMode) { [weak self] in self?.onCommandMode?() }

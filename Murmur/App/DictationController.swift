@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import AVFoundation
 import MurmurKit
 import Observation
@@ -124,7 +125,9 @@ final class DictationController {
                 Task { @MainActor in self?.appendLevel(level) }
             }
             state = .recording
+            Log.pipeline.info("Recording started (mode=\(String(describing: mode), privacy: .public), engine=\(self.settings.transcriptionEngineID.rawValue, privacy: .public), autoStop=\(autoStop))")
         } catch {
+            Log.pipeline.error("audio.start failed: \(error, privacy: .public)")
             fail(error)
         }
     }
@@ -133,8 +136,10 @@ final class DictationController {
         guard state == .recording else { return }
         let samples = audio.stop()
         let duration = recordingStart.map { Date().timeIntervalSince($0) } ?? 0
+        Log.pipeline.info("finish: \(samples.count) samples, \(String(format: "%.2f", duration))s")
 
         guard duration >= minRecordingDuration, !samples.isEmpty else {
+            Log.pipeline.info("Discarded: too short or empty (need ≥\(self.minRecordingDuration)s and audio). Check Microphone permission.")
             state = .idle
             return
         }
@@ -179,7 +184,8 @@ final class DictationController {
             let result = try await engine.transcribe(samples: samples, options: options)
 
             let raw = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !raw.isEmpty else { state = .idle; return }
+            Log.pipeline.info("Transcribed \(raw.count) chars; trusted(paste)=\(self.insertion.isTrusted)")
+            guard !raw.isEmpty else { Log.pipeline.info("Empty transcript — nothing to insert"); state = .idle; return }
 
             var text = raw
             if settings.polishEnabled {
@@ -193,12 +199,11 @@ final class DictationController {
             // Always save the transcript first, so it's never lost if paste can't run.
             recordHistory(raw: raw, final: text, duration: duration)
             guard insertion.isTrusted else {
-                insertion.copyToClipboard(text)
-                state = .error("Enable Accessibility for Murmur, then press ⌘V — your text is on the clipboard.")
-                scheduleErrorReset()
+                handleUntrusted(text, noun: "text")
                 return
             }
             state = .inserting
+            Log.insertion.info("Pasting \(text.count, privacy: .public) chars via ⌘V")
             insertion.insert(text)
             state = .idle
         } catch {
@@ -258,9 +263,7 @@ final class DictationController {
             let output = try await rewrite.rewrite(instruction: instruction, selection: selection, provider: provider, model: model)
             guard !output.isEmpty else { state = .idle; return }
             guard insertion.isTrusted else {
-                insertion.copyToClipboard(output)
-                state = .error("Enable Accessibility for Murmur, then press ⌘V — your result is on the clipboard.")
-                scheduleErrorReset()
+                handleUntrusted(output, noun: "result")
                 return
             }
             state = .inserting
@@ -337,6 +340,27 @@ final class DictationController {
                 silenceStart = Date()
             }
         }
+    }
+
+    /// Transcription succeeded but we can't paste (no Accessibility). Keep the
+    /// text on the clipboard so it's never lost, surface a clear message, and
+    /// guide the user to grant the permission (once per launch).
+    private func handleUntrusted(_ text: String, noun: String) {
+        Log.insertion.error("Not trusted for Accessibility — copied to clipboard instead of pasting")
+        insertion.copyToClipboard(text)
+        state = .error("Turn on Accessibility for Murmur to paste — your \(noun) is on the clipboard (press ⌘V).")
+        scheduleErrorReset()
+        promptForAccessibility()
+    }
+
+    private var didPromptForAccessibility = false
+    /// Show the system Accessibility prompt (with an "Open System Settings"
+    /// button) once, so the user can grant the permission that makes pasting work.
+    private func promptForAccessibility() {
+        guard !didPromptForAccessibility else { return }
+        didPromptForAccessibility = true
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 
     private func fail(_ error: Error) {
