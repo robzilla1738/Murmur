@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sparkle appcast for Murmur. The live feed is the copy attached to the latest
+  GitHub Release (see SUFeedURL in Info.plist). Per release, add an <item> with
+  values from `sign_update` — see docs/SPARKLE_SETUP.md.
+-->
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Murmur</title>
+    <link>https://github.com/robzilla1738/Murmur/releases/latest/download/appcast.xml</link>
+    <description>Most recent updates to Murmur</description>
+    <language>en</language>
+    <!--
+    <item>
+      <title>0.1.0</title>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 01 Jan 2026 00:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/robzilla1738/Murmur/releases/download/v0.1.0/Murmur-0.1.0.dmg"
+        sparkle:edSignature="REPLACE_WITH_sign_update_OUTPUT"
+        length="REPLACE_WITH_BYTE_LENGTH"
+        type="application/octet-stream" />
+    </item>
+    -->
+  </channel>
+</rss>

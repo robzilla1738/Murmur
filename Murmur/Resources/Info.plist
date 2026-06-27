@@ -39,13 +39,14 @@
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
-    <!-- Sparkle auto-update. Set SUPublicEDKey + a real SUFeedURL during release
-         setup (docs/SPARKLE_SETUP.md), then flip SUEnableAutomaticChecks to YES. -->
+    <!-- Sparkle auto-update. SUPublicEDKey is the EdDSA public key; the matching
+         private key lives in the maintainer's login Keychain (see docs/SPARKLE_SETUP.md).
+         SUFeedURL points at the appcast attached to GitHub Releases. -->
     <key>SUFeedURL</key>
-    <string>https://github.com/robzilla1738/whisper-local/releases/latest/download/appcast.xml</string>
+    <string>https://github.com/robzilla1738/Murmur/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string></string>
+    <string>3LBPx8Uv5L5ptqRqdCWovmUIPLxcDEPnivy8cOpIlH8=</string>
     <key>SUEnableAutomaticChecks</key>
-    <false/>
+    <true/>
 </dict>
 </plist>

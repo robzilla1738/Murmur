@@ -1,41 +1,44 @@
-# Sparkle auto-update setup
+# Sparkle auto-update
 
-Murmur ships with [Sparkle](https://sparkle-project.org) wired in (a "Check for
-Updates…" menu item and the updater framework). Two things must be configured
-before updates work, both one-time.
+Murmur ships with [Sparkle](https://sparkle-project.org) fully wired in: a
+"Check for Updates…" menu item, automatic background checks, and EdDSA-signed
+update verification.
 
-## 1. Generate an EdDSA signing key
+## Already configured
 
-```bash
-# Path depends on where SwiftPM cached Sparkle's tools:
-~/Library/Developer/Xcode/DerivedData/Murmur-*/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys
-```
+- **`SUPublicEDKey`** (in `Murmur/Resources/Info.plist`) is set to the project's
+  EdDSA **public** key. The matching **private** key lives only in the
+  maintainer's login Keychain — it is never committed and is required to sign
+  releases.
+- **`SUFeedURL`** points at the appcast attached to GitHub Releases:
+  `https://github.com/robzilla1738/Murmur/releases/latest/download/appcast.xml`
+- **`SUEnableAutomaticChecks`** is `YES`.
 
-This stores a private key in your login Keychain and prints the **public** key.
-Paste the public key into `Murmur/Resources/Info.plist` under `SUPublicEDKey`,
-then flip `SUEnableAutomaticChecks` to `<true/>`.
+> Forking? Generate your own key pair and replace `SUPublicEDKey` + `SUFeedURL`:
+> ```bash
+> ~/Library/Developer/Xcode/DerivedData/Murmur-*/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys
+> ```
+> It stores a private key in your Keychain and prints the public key to paste in.
 
-## 2. Host an appcast
+## Cutting a release
 
-`SUFeedURL` in Info.plist points at `appcast.xml`. The default uses the GitHub
-Releases convention:
+1. Build, notarize, and package:
+   ```bash
+   ./scripts/build-release.sh   # Developer ID, hardened-runtime app
+   ./scripts/notarize.sh        # submit to Apple, staple, verify
+   ./scripts/make-dmg.sh        # stapled, distributable DMG
+   ```
+2. Sign the DMG for Sparkle:
+   ```bash
+   ~/Library/Developer/Xcode/DerivedData/Murmur-*/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
+       build/Murmur-<version>.dmg
+   # → sparkle:edSignature="…" length="…"
+   ```
+3. Update [`appcast.xml`](../appcast.xml): add an `<item>` with the new
+   `<sparkle:version>` (build number), `<sparkle:shortVersionString>`, the DMG
+   download URL, and the `edSignature`/`length` from step 2.
+4. Create a GitHub Release for the new tag and attach **both** the DMG and the
+   updated `appcast.xml`. Sparkle handles discovery, download, and verification.
 
-```
-https://github.com/robzilla1738/whisper-local/releases/latest/download/appcast.xml
-```
-
-Per release, after `scripts/build-release.sh` + `scripts/notarize.sh` +
-`scripts/make-dmg.sh`:
-
-```bash
-# Sign the DMG/zip for Sparkle:
-~/Library/Developer/Xcode/DerivedData/Murmur-*/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
-    build/Murmur-<version>.dmg
-# Prints sparkle:edSignature="…" length="…"
-```
-
-Add an `<item>` to `appcast.xml` with the new version, the download URL, and that
-signature, then upload `appcast.xml` + the DMG to the release. Sparkle handles
-the rest.
-
-See Apple's notarization flow in [`../scripts/notarize.sh`](../scripts/notarize.sh).
+The bundled `appcast.xml` is a template/seed; the live feed is the copy attached
+to the latest GitHub Release (per `SUFeedURL`).
