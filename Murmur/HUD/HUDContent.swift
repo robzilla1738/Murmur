@@ -7,6 +7,11 @@ struct HUDContent: View {
     /// Notch sits on a black shell, so prefer light ink; pill uses primary.
     var onDark: Bool = false
 
+    /// The last non-idle state, kept so the HUD shows the completed frame (e.g.
+    /// "Inserted") while it animates out, instead of flashing a lonely idle mic
+    /// during the ~800 ms hide window.
+    @State private var displayState: DictationController.State = .recording
+
     private var ink: Color { onDark ? .white : Theme.ink }
     private var muted: Color { onDark ? .white.opacity(0.6) : Theme.inkMuted }
 
@@ -16,15 +21,35 @@ struct HUDContent: View {
                 .font(.system(size: 13, weight: .semibold))
             detail
         }
-        .frame(height: 22)
+        // Vertically center; let content size to Dynamic Type rather than a hard
+        // height that would clip large accessibility text.
+        .frame(minHeight: 22)
         // A generous, consistent width so the recording HUD reads as substantial
         // (not a thin sliver) and the surface doesn't jump in size between states.
         .frame(minWidth: 188)
+        .onAppear { if controller.state != .idle { displayState = controller.state } }
+        .onChange(of: controller.state) { _, new in
+            if new != .idle { displayState = new }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        switch displayState {
+        case .recording: "Recording"
+        case .transcribing: "Transcribing"
+        case .polishing: "Polishing"
+        case .downloading(let p): "Downloading model \(Int(p * 100)) percent"
+        case .inserting: "Inserted"
+        case .error(let m): m
+        case .idle: "Idle"
+        }
     }
 
     @ViewBuilder
     private var icon: some View {
-        switch controller.state {
+        switch displayState {
         case .recording:
             // Steady — no pulse / color change.
             Image(systemName: "mic.fill")
@@ -47,7 +72,7 @@ struct HUDContent: View {
 
     @ViewBuilder
     private var detail: some View {
-        switch controller.state {
+        switch displayState {
         case .recording:
             WaveformView(levels: controller.levels, barCount: 28, tint: ink)
                 .frame(width: 168)

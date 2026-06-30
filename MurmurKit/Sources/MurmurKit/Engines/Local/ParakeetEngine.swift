@@ -23,7 +23,11 @@ public actor ParakeetEngine: TranscriptionEngine {
     public func prepare(model: TranscriptionModel, progress: @Sendable @escaping (Double) -> Void) async throws {
         if manager != nil { progress(1); return }
 
+        // Download into Murmur's own Application Support models directory (not
+        // FluidAudio's library default) so all on-device models live in one place
+        // that uninstall/cleanup can reason about. See `ModelStorage`.
         let models = try await AsrModels.downloadAndLoad(
+            to: ModelStorage.parakeetDirectory,
             version: version,
             progressHandler: { p in progress(min(1, max(0, p.fractionCompleted))) }
         )

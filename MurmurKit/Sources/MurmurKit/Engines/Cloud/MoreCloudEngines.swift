@@ -7,7 +7,7 @@ public final class DeepgramTranscriptionEngine: TranscriptionEngine, @unchecked 
     public let id = TranscriptionEngineID.deepgram
     private let apiKey: String?
     private let modelID: String
-    private let session = URLSession(configuration: .ephemeral)
+    private let session = URLSession(configuration: .murmurUpload())
 
     public init(apiKey: String?, modelID: String) {
         self.apiKey = apiKey
@@ -67,7 +67,7 @@ public final class ElevenLabsTranscriptionEngine: TranscriptionEngine, @unchecke
     public let id = TranscriptionEngineID.elevenLabs
     private let apiKey: String?
     private let modelID: String
-    private let session = URLSession(configuration: .ephemeral)
+    private let session = URLSession(configuration: .murmurUpload())
 
     public init(apiKey: String?, modelID: String) {
         self.apiKey = apiKey
@@ -110,7 +110,7 @@ public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecke
     public let id = TranscriptionEngineID.assemblyAI
     private let apiKey: String?
     private let modelID: String
-    private let session = URLSession(configuration: .ephemeral)
+    private let session = URLSession(configuration: .murmurUpload())
     private let base = "https://api.assemblyai.com/v2"
 
     public init(apiKey: String?, modelID: String) {
@@ -128,9 +128,11 @@ public final class AssemblyAITranscriptionEngine: TranscriptionEngine, @unchecke
         guard let apiKey, !apiKey.isEmpty else { throw TranscriptionError.missingAPIKey(id) }
 
         // 1. Upload audio bytes.
+        try Task.checkCancellation()
         let uploadURL = try await upload(WAVEncoder.encode(samples: samples), apiKey: apiKey)
 
         // 2. Create transcript with the selected speech model.
+        try Task.checkCancellation()
         let transcriptID = try await create(audioURL: uploadURL, language: options.language, apiKey: apiKey)
 
         // 3. Poll until completed, bounded by a wall-clock DEADLINE rather than a

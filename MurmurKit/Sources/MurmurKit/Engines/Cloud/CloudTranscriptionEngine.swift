@@ -1,5 +1,18 @@
 import Foundation
 
+extension URLSessionConfiguration {
+    /// Ephemeral config tuned for audio uploads: a short per-request timeout
+    /// (connection/response responsiveness) but a generous resource timeout so a
+    /// large recording on a slow uplink isn't abandoned mid-upload. A ~15-minute
+    /// recording is ~28 MB of WAV, which can take minutes to send.
+    static func murmurUpload(requestTimeout: TimeInterval = 60) -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = requestTimeout
+        config.timeoutIntervalForResource = 600 // 10 minutes for the whole transfer
+        return config
+    }
+}
+
 /// Transcription engine for OpenAI-compatible `/audio/transcriptions` endpoints
 /// (OpenAI, Groq). Uploads 16 kHz mono audio as WAV via multipart form.
 public final class CloudTranscriptionEngine: TranscriptionEngine, @unchecked Sendable {
@@ -14,9 +27,7 @@ public final class CloudTranscriptionEngine: TranscriptionEngine, @unchecked Sen
         self.baseURL = baseURL
         self.apiKey = apiKey
         self.modelID = modelID
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 60
-        self.session = URLSession(configuration: config)
+        self.session = URLSession(configuration: .murmurUpload())
     }
 
     public func prepare(model: TranscriptionModel, progress: @Sendable @escaping (Double) -> Void) async throws {

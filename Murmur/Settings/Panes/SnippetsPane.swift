@@ -26,9 +26,24 @@ struct SnippetsPane: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(snippets) { snippet in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(snippet.trigger).font(.headline)
-                            Text(snippet.expansion).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(snippet.trigger).font(.headline)
+                                Text(snippet.expansion).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                            Spacer()
+                            // macOS has no swipe-to-delete, so expose an explicit
+                            // remove control on each row.
+                            Button(role: .destructive) { remove(snippet) } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Remove snippet")
+                            .accessibilityLabel("Remove \(snippet.trigger)")
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) { remove(snippet) } label: { Label("Delete", systemImage: "trash") }
                         }
                     }
                     .onDelete(perform: delete)
@@ -50,6 +65,11 @@ struct SnippetsPane: View {
 
     private func delete(_ offsets: IndexSet) {
         for index in offsets { context.delete(snippets[index]) }
+        try? context.save()
+    }
+
+    private func remove(_ snippet: Snippet) {
+        context.delete(snippet)
         try? context.save()
     }
 }

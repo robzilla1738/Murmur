@@ -14,8 +14,11 @@ final class AppState {
     let keychain: KeychainStore
     let permissions: PermissionsManager
     let registry: EngineRegistry
-    let serverDetector = LocalServerDetector()
     let modelContainer: ModelContainer
+    /// True when persistence fell back to an in-memory store (the on-disk store
+    /// couldn't be opened). History/Dictionary/Snippets won't survive relaunch;
+    /// surfaced to the user rather than crashing.
+    let persistenceIsEphemeral: Bool
 
     /// Set by `AppDelegate` once the pipeline is built.
     var dictation: DictationController?
@@ -28,10 +31,24 @@ final class AppState {
         self.keychain = keychain
         self.permissions = PermissionsManager()
         self.registry = EngineRegistry(settings: settings, keychain: keychain)
-        do {
-            self.modelContainer = try ModelContainer(for: HistoryItem.self, DictionaryEntry.self, Snippet.self)
-        } catch {
-            fatalError("Failed to create SwiftData container: \(error)")
+
+        // History/Dictionary/Snippets are not core to dictation, so a failed or
+        // corrupted on-disk store must never brick the app. Try the persistent
+        // store; on failure fall back to an in-memory one so the app still runs.
+        let schema: [any PersistentModel.Type] = [HistoryItem.self, DictionaryEntry.self, Snippet.self]
+        if let container = try? ModelContainer(for: HistoryItem.self, DictionaryEntry.self, Snippet.self) {
+            self.modelContainer = container
+            self.persistenceIsEphemeral = false
+        } else {
+            Log.app.error("Persistent SwiftData store unavailable; falling back to in-memory store")
+            let config = ModelConfiguration(isStoredInMemoryOnly: true)
+            // An in-memory container with a valid schema is effectively infallible;
+            // if even this fails the process genuinely can't continue.
+            self.modelContainer = try! ModelContainer(
+                for: Schema(schema),
+                configurations: [config]
+            )
+            self.persistenceIsEphemeral = true
         }
     }
 }

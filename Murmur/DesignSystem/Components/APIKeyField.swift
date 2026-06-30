@@ -31,6 +31,7 @@ struct APIKeyField: View {
             }
             .buttonStyle(.borderless)
             .help(revealed ? "Hide" : "Show")
+            .accessibilityLabel(revealed ? "Hide API key" : "Show API key")
         }
         .onAppear { value = keychain.value(for: account) ?? "" }
         .onChange(of: value) { _, newValue in

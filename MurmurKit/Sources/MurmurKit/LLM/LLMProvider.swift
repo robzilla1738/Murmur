@@ -93,7 +93,7 @@ public enum LLMError: LocalizedError {
         switch self {
         case .missingAPIKey(let id): "No API key set for \(id.displayName). Add one in Settings."
         case .invalidBaseURL(let s): "Invalid server URL: \(s)"
-        case .http(let status, let body): "LLM request failed (HTTP \(status)). \(body)"
+        case .http(let status, let body): "LLM request failed (HTTP \(status)). \(HTTPBody.summarize(body))"
         case .network(let message): "Network error: \(message)"
         case .decoding(let message): "Couldn't read the LLM response: \(message)"
         case .noModelSelected: "No model selected for the AI cleanup provider."

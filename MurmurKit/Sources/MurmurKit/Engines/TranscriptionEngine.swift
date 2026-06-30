@@ -86,6 +86,18 @@ public struct TranscriptionResult: Sendable {
 
 // MARK: - Errors
 
+/// Helpers for turning a raw HTTP error body into something fit for a user-facing
+/// HUD message — providers can return multi-kilobyte HTML/JSON error pages.
+enum HTTPBody {
+    static func summarize(_ body: String, limit: Int = 200) -> String {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        // Collapse whitespace/newlines so a wrapped HTML page reads as one line.
+        let collapsed = trimmed.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return collapsed.count > limit ? String(collapsed.prefix(limit)) + "…" : collapsed
+    }
+}
+
 public enum TranscriptionError: LocalizedError {
     case missingAPIKey(TranscriptionEngineID)
     case modelNotPrepared
@@ -100,7 +112,7 @@ public enum TranscriptionError: LocalizedError {
         case .missingAPIKey(let id): "No API key set for \(id.displayName). Add one in Settings."
         case .modelNotPrepared: "The transcription model isn't loaded yet."
         case .emptyAudio: "No audio was captured."
-        case .http(let status, let body): "Transcription request failed (HTTP \(status)). \(body)"
+        case .http(let status, let body): "Transcription request failed (HTTP \(status)). \(HTTPBody.summarize(body))"
         case .network(let message): "Network error: \(message)"
         case .decoding(let message): "Couldn't read the transcription response: \(message)"
         case .unsupported(let message): message

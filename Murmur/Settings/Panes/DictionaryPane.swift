@@ -32,6 +32,18 @@ struct DictionaryPane: View {
                                 Text(replacement).foregroundStyle(.secondary)
                             }
                             Spacer()
+                            // macOS has no swipe-to-delete, so expose an explicit
+                            // remove control on each row.
+                            Button(role: .destructive) { remove(entry) } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Remove term")
+                            .accessibilityLabel("Remove \(entry.phrase)")
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) { remove(entry) } label: { Label("Delete", systemImage: "trash") }
                         }
                     }
                     .onDelete(perform: delete)
@@ -54,6 +66,11 @@ struct DictionaryPane: View {
 
     private func delete(_ offsets: IndexSet) {
         for index in offsets { context.delete(entries[index]) }
+        try? context.save()
+    }
+
+    private func remove(_ entry: DictionaryEntry) {
+        context.delete(entry)
         try? context.save()
     }
 }

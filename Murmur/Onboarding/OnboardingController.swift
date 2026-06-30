@@ -37,13 +37,15 @@ final class OnboardingController {
         }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 660),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
+        // Allow growth (e.g. at large Dynamic Type) but keep a sane floor.
+        window.minSize = NSSize(width: 460, height: 560)
         window.contentView = NSHostingView(rootView: view.environment(appState))
         window.center()
         window.isReleasedWhenClosed = false

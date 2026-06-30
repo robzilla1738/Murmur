@@ -15,10 +15,41 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            // Scroll the header + rows so large Dynamic Type / many rows never clip
+            // the action button, which stays pinned at the bottom.
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
 
-            VStack(spacing: 12) {
-                PermissionRow(
+                    VStack(spacing: 12) {
+                        permissionRows
+                    }
+                    .padding(24)
+                }
+            }
+
+            Divider()
+
+            Button(action: onFinish) {
+                Text(permissions.coreGranted ? "Start dictating" : "Continue")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.large)
+            .buttonStyle(.borderedProminent)
+            .tint(.primary)
+            .padding(24)
+        }
+        .frame(minWidth: 460, idealWidth: 460, minHeight: 560, idealHeight: 660)
+        .background(.background)
+        .onAppear {
+            if appState.registry.isCurrentEnginePrepared { modelState = .ready }
+        }
+    }
+
+    @ViewBuilder
+    private var permissionRows: some View {
+        Group {
+            PermissionRow(
                     icon: "mic.fill",
                     title: "Microphone",
                     description: "Record your voice. Required.",
@@ -47,29 +78,11 @@ struct OnboardingView: View {
                     modelRow
                 }
 
-                Text("Then **tap ⌃⌥D** to start and stop dictation, or **hold Right ⌘** and speak. If the hold key isn't detected after granting, toggle Murmur off and back on in the Input Monitoring list — macOS sometimes keeps a stale entry.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-            }
-            .padding(24)
-
-            Spacer(minLength: 0)
-
-            Button(action: onFinish) {
-                Text(permissions.coreGranted ? "Start dictating" : "Continue")
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
-            .tint(.primary)
-            .padding(24)
-        }
-        .frame(width: 460, height: 660)
-        .background(.background)
-        .onAppear {
-            if appState.registry.isCurrentEnginePrepared { modelState = .ready }
+            Text("Then **tap ⌃⌥D** to start and stop dictation, or **hold Right ⌘** and speak. If the hold key isn't detected after granting, toggle Murmur off and back on in the Input Monitoring list — macOS sometimes keeps a stale entry.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
         }
     }
 
@@ -127,7 +140,7 @@ struct OnboardingView: View {
             }
         }
         .padding(14)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 
     private func modelSubtitle(_ model: TranscriptionModel) -> String {
@@ -193,6 +206,6 @@ private struct PermissionRow: View {
             }
         }
         .padding(14)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 }

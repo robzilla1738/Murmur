@@ -17,7 +17,7 @@ struct AboutPane: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Link("View on GitHub", destination: URL(string: "https://github.com/robzilla1738/whisper-local")!)
+            Link("View on GitHub", destination: URL(string: "https://github.com/robzilla1738/Murmur")!)
                 .padding(.top, 4)
 
             Spacer()

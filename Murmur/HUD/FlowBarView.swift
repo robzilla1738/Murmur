@@ -6,7 +6,15 @@ import SwiftUI
 struct FlowBarView: View {
     var controller: DictationController
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var shown = false
+
+    /// A hairline rim on the glass capsule: a faint white top-highlight on dark
+    /// glass, a faint dark separator on light glass. A fixed white stroke is
+    /// invisible (and the wrong direction) in light mode.
+    private var rimColor: Color {
+        colorScheme == .dark ? .white.opacity(0.10) : .black.opacity(0.08)
+    }
 
     var body: some View {
         HUDContent(controller: controller)
@@ -14,7 +22,7 @@ struct FlowBarView: View {
             .padding(.vertical, 11)
             .glassSurface(in: Capsule())
             .overlay(
-                Capsule().strokeBorder(.white.opacity(0.06), lineWidth: 0.5)
+                Capsule().strokeBorder(rimColor, lineWidth: 0.5)
             )
             .fixedSize()
             .scaleEffect(shown ? 1 : 0.9, anchor: .bottom)

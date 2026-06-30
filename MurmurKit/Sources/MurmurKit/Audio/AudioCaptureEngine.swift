@@ -140,7 +140,22 @@ public final class AudioCaptureEngine: @unchecked Sendable {
 
     private func process(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
-        guard isRunning, let converter else { lock.unlock(); return }
+        guard isRunning, var converter = self.converter else { lock.unlock(); return }
+        // The input device's format can change mid-recording (e.g. a Bluetooth
+        // headset switching profiles, or a default-device change). The converter
+        // is built from the format at start; if the live buffer no longer matches,
+        // rebuild it so we don't feed a stale resampler and silently drop audio.
+        if converter.inputFormat != buffer.format {
+            if let rebuilt = AVAudioConverter(from: buffer.format, to: outputFormat) {
+                converter = rebuilt
+                self.converter = rebuilt
+                Log.audio.info("Input format changed to \(buffer.format.sampleRate, format: .fixed(precision: 0)) Hz; rebuilt converter")
+            } else {
+                lock.unlock()
+                Log.audio.error("Input format changed but converter rebuild failed; dropping buffer")
+                return
+            }
+        }
         lock.unlock()
 
         let ratio = outputFormat.sampleRate / buffer.format.sampleRate
@@ -195,7 +210,11 @@ public final class AudioCaptureEngine: @unchecked Sendable {
 
     /// Pin the engine's input to a specific device (must happen before start).
     private func bindDevice(_ uid: String?, to input: AVAudioInputNode) {
-        guard let uid, let deviceID = AudioDevices.device(forUID: uid), let unit = input.audioUnit else { return }
+        guard let uid else { return } // no preference → system default
+        guard let deviceID = AudioDevices.device(forUID: uid), let unit = input.audioUnit else {
+            Log.audio.warning("Selected input device \(uid, privacy: .public) is unavailable; using system default")
+            return
+        }
         var device = deviceID
         let status = AudioUnitSetProperty(
             unit,

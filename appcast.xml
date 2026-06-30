@@ -13,14 +13,32 @@
     <description>Most recent updates to Murmur</description>
     <language>en</language>
     <!--
+      Per release: fill in edSignature + length from `sign_update` (see
+      docs/SPARKLE_SETUP.md), uncomment the matching <item>, and attach this file
+      to the GitHub Release alongside the DMG.
+    -->
+    <!--
     <item>
-      <title>0.1.0</title>
-      <sparkle:version>1</sparkle:version>
-      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <title>0.1.1</title>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <pubDate>Mon, 01 Jan 2026 00:00:00 +0000</pubDate>
+      <pubDate>Mon, 29 Jun 2026 00:00:00 +0000</pubDate>
+      <description><![CDATA[
+        <h2>Murmur 0.1.1 — reliability &amp; polish</h2>
+        <ul>
+          <li>No longer crashes if the local database is corrupt — falls back to an in-memory store and keeps working.</li>
+          <li>Local Parakeet downloads into Murmur's own models directory.</li>
+          <li>Audio capture survives a mid-recording input-format change.</li>
+          <li>Cloud transcription no longer times out on long recordings.</li>
+          <li>Command Mode / Transforms no longer clobber the clipboard.</li>
+          <li>Dictionary, Snippets, and History rows now have explicit delete controls.</li>
+          <li>Onboarding scrolls/resizes; recording pill border adapts to light/dark; VoiceOver labels added.</li>
+        </ul>
+        <p>Full notes: https://github.com/robzilla1738/Murmur/blob/main/CHANGELOG.md</p>
+      ]]></description>
       <enclosure
-        url="https://github.com/robzilla1738/Murmur/releases/download/v0.1.0/Murmur-0.1.0.dmg"
+        url="https://github.com/robzilla1738/Murmur/releases/download/v0.1.1/Murmur-0.1.1.dmg"
         sparkle:edSignature="REPLACE_WITH_sign_update_OUTPUT"
         length="REPLACE_WITH_BYTE_LENGTH"
         type="application/octet-stream" />

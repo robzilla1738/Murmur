@@ -48,6 +48,8 @@ struct PolishPane: View {
                         }
                         .buttonStyle(.borderless)
                         .help("Refresh model list")
+                        .accessibilityLabel("Refresh model list")
+                        .disabled(loadingModels)
                     }
                     if loadingModels {
                         ProgressView().controlSize(.small)

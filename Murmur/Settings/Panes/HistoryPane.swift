@@ -6,10 +6,17 @@ import MurmurKit
 struct HistoryPane: View {
     @Query(sort: \HistoryItem.date, order: .reverse) private var items: [HistoryItem]
     @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         Group {
-            if items.isEmpty {
+            if appState.persistenceIsEphemeral {
+                ContentUnavailableView {
+                    Label("History unavailable", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text("Murmur couldn't open its database, so dictations, dictionary, and snippets aren't being saved this session. Restarting may fix it.")
+                }
+            } else if items.isEmpty {
                 ContentUnavailableView(
                     "No dictations yet",
                     systemImage: "clock",
@@ -19,6 +26,14 @@ struct HistoryPane: View {
                 List {
                     ForEach(items) { item in
                         HistoryRow(item: item)
+                            .contextMenu {
+                                Button {
+                                    copyToClipboard(item.insertedText)
+                                } label: { Label("Copy", systemImage: "doc.on.doc") }
+                                Button(role: .destructive) {
+                                    remove(item)
+                                } label: { Label("Delete", systemImage: "trash") }
+                            }
                     }
                     .onDelete(perform: delete)
                 }
@@ -45,6 +60,17 @@ struct HistoryPane: View {
         for item in items { context.delete(item) }
         try? context.save()
     }
+
+    private func remove(_ item: HistoryItem) {
+        context.delete(item)
+        try? context.save()
+    }
+
+    private func copyToClipboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
 }
 
 private struct HistoryRow: View {
@@ -69,6 +95,7 @@ private struct HistoryRow: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Copy to clipboard")
+                .accessibilityLabel("Copy to clipboard")
             }
             .font(.caption)
             .foregroundStyle(.secondary)

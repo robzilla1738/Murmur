@@ -288,7 +288,13 @@ final class DictationController {
             durationMs: Int(duration * 1000)
         )
         context.insert(item)
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            // The transcript is still on the clipboard after paste, so it isn't
+            // truly lost, but a persistent save failure shouldn't be silent.
+            Log.pipeline.error("Failed to save history item: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Get the prepared engine from the shared registry cache, surfacing local
@@ -299,13 +305,17 @@ final class DictationController {
         if isLocal, !registry.isCurrentEnginePrepared {
             state = .downloading(0)
         }
-        return try await registry.preparedTranscriptionEngine { [weak self] progress in
+        let engine = try await registry.preparedTranscriptionEngine { [weak self] progress in
             Task { @MainActor in
                 guard let self, isLocal, progress < 1 else { return }
                 if case .transcribing = self.state { self.state = .downloading(progress) }
                 else if case .downloading = self.state { self.state = .downloading(progress) }
             }
         }
+        // A first-run download leaves the state at the last `downloading` value;
+        // move back to `transcribing` so the HUD reflects the actual next step.
+        if case .downloading = state { state = .transcribing }
+        return engine
     }
 
     /// Run AI cleanup; on failure, fall back to the raw transcript.

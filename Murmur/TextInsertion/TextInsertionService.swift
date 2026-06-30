@@ -57,10 +57,13 @@ final class TextInsertionService {
         synthesizeCopy()
         try? await Task.sleep(for: .milliseconds(120))
 
-        let copied = pasteboard.changeCount != changeCountBefore
-            ? pasteboard.string(forType: .string)
-            : nil
-        restore(snapshot)
+        let didCopy = pasteboard.changeCount != changeCountBefore
+        let copied = didCopy ? pasteboard.string(forType: .string) : nil
+        // Only restore if nothing else has touched the pasteboard since our ⌘C —
+        // otherwise we'd clobber a copy the user made during the window. The
+        // expected count is our pre-copy count (no copy) or post-copy count.
+        let expected = didCopy ? pasteboard.changeCount : changeCountBefore
+        restore(snapshot, ifChangeCountIs: expected)
         return copied?.isEmpty == false ? copied : nil
     }
 
