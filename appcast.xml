@@ -14,10 +14,9 @@
     <language>en</language>
     <!--
       Per release: fill in edSignature + length from `sign_update` (see
-      docs/SPARKLE_SETUP.md), uncomment the matching <item>, and attach this file
-      to the GitHub Release alongside the DMG.
+      docs/SPARKLE_SETUP.md), add the matching <item>, and attach this file to the
+      GitHub Release alongside the DMG.
     -->
-    <!--
     <item>
       <title>0.1.1</title>
       <sparkle:version>2</sparkle:version>
@@ -39,10 +38,9 @@
       ]]></description>
       <enclosure
         url="https://github.com/robzilla1738/Murmur/releases/download/v0.1.1/Murmur-0.1.1.dmg"
-        sparkle:edSignature="REPLACE_WITH_sign_update_OUTPUT"
-        length="REPLACE_WITH_BYTE_LENGTH"
+        sparkle:edSignature="1rNTwusT/CfGtZnMpaFzQNGCzgYZKOuL/W1GipUOOjQGL7hG9cv4nDi2/9iYx9jug4fh5hkZ/9lBxo5fvm6LDw=="
+        length="7272238"
         type="application/octet-stream" />
     </item>
-    -->
   </channel>
 </rss>
